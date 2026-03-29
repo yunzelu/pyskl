@@ -290,6 +290,8 @@ def main():
         action_label = ''
     else:
         results = inference_recognizer(model, fake_anno)
+        print("")
+        print(results)
         action_label = label_map[results[0][0]]
 
     pose_model = init_pose_model(args.pose_config, args.pose_checkpoint,

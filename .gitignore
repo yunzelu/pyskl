@@ -133,3 +133,6 @@ test.ipynb
 
 # other
 jobs
+*.out
+
+checkpoints
