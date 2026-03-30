@@ -63,7 +63,7 @@ def run_official_visualizer(video_in, video_out, poses_path, actions_path):
             # We fetch the prediction from your trained ST-GCN++ model's output
             action_label = get_action_label(actions_data, tid, frame_idx)
             box = p["box"] 
-            annotator.box_label(box, action_label, color=colors(tid, True))
+            annotator.box_label(box, f"{tid}|{action_label}", color=colors(tid, True))
         
         # Get the final annotated BGR image
         final_frame = annotator.result()
