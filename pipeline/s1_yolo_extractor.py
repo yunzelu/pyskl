@@ -15,6 +15,7 @@ def extract_and_track(video_path, output_json):
             continue # No track IDs in this frame
             
         track_ids = r.boxes.id.cpu().numpy()
+        boxes = r.boxes.xyxy.cpu().numpy()
         keypoints = r.keypoints.data.cpu().numpy() # Shape: (Num_persons, 17, 3)
         
         for i, track_id in enumerate(track_ids):
@@ -22,6 +23,7 @@ def extract_and_track(video_path, output_json):
             person_data = {
                 "frame_id": frame_idx,
                 "track_id": int(track_id),
+                "box": boxes[i].tolist(),
                 "keypoints": keypoints[i].tolist() 
             }
             video_data.append(person_data)

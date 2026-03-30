@@ -62,19 +62,8 @@ def run_official_visualizer(video_in, video_out, poses_path, actions_path):
             # 2. Add the Action Recognition label
             # We fetch the prediction from your trained ST-GCN++ model's output
             action_label = get_action_label(actions_data, tid, frame_idx)
-            
-            # Create a simple bounding box around keypoints to place the label
-            # YOLO's box_label looks much cleaner than standard cv2.putText
-            visible_kpts = kpts[kpts[:, 2] > 0.5]
-            if len(visible_kpts) > 0:
-                x_min, y_min = visible_kpts[:, :2].min(0)[0].item(), visible_kpts[:, :2].min(0)[1].item()
-                x_max, y_max = visible_kpts[:, :2].max(0)[0].item(), visible_kpts[:, :2].max(0)[1].item()
-                
-                label = f"ID:{tid} | {action_label}" if action_label else f"ID:{tid}"
-                
-                # Draw the label box at the top of the person
-                # We use the native color palette based on track_id
-                annotator.box_label([x_min, y_min, x_max, y_max], label, color=colors(tid, True))
+            box = p["box"] 
+            annotator.box_label(box, action_label, color=colors(tid, True))
         
         # Get the final annotated BGR image
         final_frame = annotator.result()
