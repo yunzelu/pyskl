@@ -1,0 +1,332 @@
+[
+  {
+    "track_id": 1,
+    "action": "Walking",
+    "start_frame": 82,
+    "end_frame": 152
+  },
+  {
+    "track_id": 1,
+    "action": "Standing",
+    "start_frame": 153,
+    "end_frame": 218
+  },
+  {
+    "track_id": 1,
+    "action": "Walking",
+    "start_frame": 219,
+    "end_frame": 325
+  },
+  {
+    "track_id": 1,
+    "action": "Standing",
+    "start_frame": 326,
+    "end_frame": 410
+  },
+  {
+    "track_id": 1,
+    "action": "Walking",
+    "start_frame": 411,
+    "end_frame": 513
+  },
+  {
+    "track_id": 1,
+    "action": "Standing",
+    "start_frame": 514,
+    "end_frame": 604
+  },
+  {
+    "track_id": 1,
+    "action": "Walking",
+    "start_frame": 605,
+    "end_frame": 759
+  },
+  {
+    "track_id": 9,
+    "action": "Walking",
+    "start_frame": 905,
+    "end_frame": 973
+  },
+  {
+    "track_id": 9,
+    "action": "Standing",
+    "start_frame": 974,
+    "end_frame": 980
+  },
+  {
+    "track_id": 9,
+    "action": "Sitting",
+    "start_frame": 981,
+    "end_frame": 1195
+  },
+  {
+    "track_id": 9,
+    "action": "Walking",
+    "start_frame": 1196,
+    "end_frame": 1313
+  },
+  {
+    "track_id": 9,
+    "action": "Sitting",
+    "start_frame": 1314,
+    "end_frame": 2108
+  },
+  {
+    "track_id": 9,
+    "action": "Walking",
+    "start_frame": 2109,
+    "end_frame": 2290
+  },
+  {
+    "track_id": 9,
+    "action": "Sitting",
+    "start_frame": 2291,
+    "end_frame": 3032
+  },
+  {
+    "track_id": 9,
+    "action": "Walking",
+    "start_frame": 3033,
+    "end_frame": 3131
+  },
+  {
+    "track_id": 9,
+    "action": "Sitting",
+    "start_frame": 3132,
+    "end_frame": 3907
+  },
+  {
+    "track_id": 9,
+    "action": "Walking",
+    "start_frame": 3908,
+    "end_frame": 4018
+  },
+  {
+    "track_id": 9,
+    "action": "Sitting",
+    "start_frame": 4019,
+    "end_frame": 4061
+  },
+  {
+    "track_id": 9,
+    "action": "Lying",
+    "start_frame": 4062,
+    "end_frame": 4548
+  },
+  {
+    "track_id": 56,
+    "action": "Lying",
+    "start_frame": 4750,
+    "end_frame": 4782
+  },
+  {
+    "track_id": 56,
+    "action": "Sitting",
+    "start_frame": 4783,
+    "end_frame": 4827
+  },
+  {
+    "track_id": 56,
+    "action": "Walking",
+    "start_frame": 4829,
+    "end_frame": 5106
+  },
+  {
+    "track_id": 56,
+    "action": "Standing",
+    "start_frame": 5107,
+    "end_frame": 5338
+  },
+  {
+    "track_id": 61,
+    "action": "Standing",
+    "start_frame": 5338,
+    "end_frame": 5415
+  },
+  {
+    "track_id": 62,
+    "action": "Standing",
+    "start_frame": 5415,
+    "end_frame": 5505
+  },
+  {
+    "track_id": 62,
+    "action": "Walking",
+    "start_frame": 5506,
+    "end_frame": 5608
+  },
+  {
+    "track_id": 62,
+    "action": "Standing",
+    "start_frame": 5609,
+    "end_frame": 5742
+  },
+  {
+    "track_id": 62,
+    "action": "Walking",
+    "start_frame": 5743,
+    "end_frame": 5835
+  },
+  {
+    "track_id": 66,
+    "action": "Walking",
+    "start_frame": 5835,
+    "end_frame": 5975
+  },
+  {
+    "track_id": 66,
+    "action": "Walking",
+    "start_frame": 5976,
+    "end_frame": 6117
+  },
+  {
+    "track_id": 66,
+    "action": "Standing",
+    "start_frame": 6118,
+    "end_frame": 6127
+  },
+  {
+    "track_id": 66,
+    "action": "Sitting",
+    "start_frame": 6128,
+    "end_frame": 6139
+  },
+  {
+    "track_id": 66,
+    "action": "Lying",
+    "start_frame": 6140,
+    "end_frame": 6436
+  },
+  {
+    "track_id": 66,
+    "action": "Sitting",
+    "start_frame": 6437,
+    "end_frame": 6477
+  },
+  {
+    "track_id": 66,
+    "action": "Walking",
+    "start_frame": 6478,
+    "end_frame": 6594
+  },
+  {
+    "track_id": 66,
+    "action": "Sitting",
+    "start_frame": 6595,
+    "end_frame": 6606
+  },
+  {
+    "track_id": 66,
+    "action": "Lying",
+    "start_frame": 6607,
+    "end_frame": 6644
+  },
+  {
+    "track_id": 118,
+    "action": "Lying",
+    "start_frame": 6787,
+    "end_frame": 7077
+  },
+  {
+    "track_id": 158,
+    "action": "Lying",
+    "start_frame": 7089,
+    "end_frame": 7107
+  },
+  {
+    "track_id": 158,
+    "action": "Sitting",
+    "start_frame": 7108,
+    "end_frame": 7134
+  },
+  {
+    "track_id": 158,
+    "action": "Walking",
+    "start_frame": 7135,
+    "end_frame": 7259
+  },
+  {
+    "track_id": 163,
+    "action": "Walking",
+    "start_frame": 7491,
+    "end_frame": 7563
+  },
+  {
+    "track_id": 163,
+    "action": "Sitting",
+    "start_frame": 7564,
+    "end_frame": 7605
+  },
+  {
+    "track_id": 163,
+    "action": "Lying",
+    "start_frame": 7606,
+    "end_frame": 7736
+  },
+  {
+    "track_id": 180,
+    "action": "Lying",
+    "start_frame": 7785,
+    "end_frame": 7796
+  },
+  {
+    "track_id": 181,
+    "action": "Lying",
+    "start_frame": 7803,
+    "end_frame": 7874
+  },
+  {
+    "track_id": 205,
+    "action": "Lying",
+    "start_frame": 7942,
+    "end_frame": 7980
+  },
+  {
+    "track_id": 205,
+    "action": "Sitting",
+    "start_frame": 7981,
+    "end_frame": 7997
+  },
+  {
+    "track_id": 205,
+    "action": "Standing",
+    "start_frame": 7998,
+    "end_frame": 8025
+  },
+  {
+    "track_id": 205,
+    "action": "Standing",
+    "start_frame": 8026,
+    "end_frame": 8075
+  },
+  {
+    "track_id": 205,
+    "action": "Sitting",
+    "start_frame": 8076,
+    "end_frame": 8098
+  },
+  {
+    "track_id": 217,
+    "action": "Lying",
+    "start_frame": 8124,
+    "end_frame": 8287
+  },
+  {
+    "track_id": 231,
+    "action": "Lying",
+    "start_frame": 8290,
+    "end_frame": 8323
+  },
+  {
+    "track_id": 231,
+    "action": "Sitting",
+    "start_frame": 8332,
+    "end_frame": 8335
+  },
+  {
+    "track_id": 231,
+    "action": "Walking",
+    "start_frame": 8336,
+    "end_frame": 8433
+  }
+]

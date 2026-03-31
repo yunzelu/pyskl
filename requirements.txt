@@ -34,3 +34,7 @@ terminaltables
 tabulate
 yacs
 addict
+
+ultralytics
+scikit-learn
+seaborn

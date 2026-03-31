@@ -138,5 +138,6 @@ jobs
 checkpoints
 
 pipeline/*.mp4
+pipeline/*.png
 
 up_dataset
