@@ -54,10 +54,10 @@ if __name__ == "__main__":
     # 2. Run ST-GCN++ 
     action_results = run_action_recognition(
         windows=windows,
-        config_path="configs/stgcn++/har4_j.py",
-        checkpoint_path="work_dirs//stgcn++/har4_j/latest.pth",
+        config_path="configs/ctrgcn/har4_j.py",
+        checkpoint_path="work_dirs/ctrgcn/har4_j/latest.pth",
         label_map_path="tools/data/label_map/har4.txt"
     )
 
-    with open("pipeline/s2_WIN_20260326_15_06_23_Pro.json", "w") as f:
+    with open("pipeline/ctrgcn_WIN_20260326_15_06_23_Pro.json", "w") as f:
         json.dump(action_results, f)
