@@ -77,7 +77,7 @@ def run_official_visualizer(video_in, video_out, poses_path, actions_path):
 if __name__ == "__main__":
     run_official_visualizer(
         video_in="pipeline/WIN_20260326_15_06_23_Pro.mp4",
-        video_out="pipeline/s3_WIN_20260326_15_06_23_Pro.mp4",
+        video_out="pipeline/s3_cnntransformer_WIN_20260326_15_06_23_Pro.mp4",
         poses_path="pipeline/WIN_20260326_15_06_23_Pro.json",
-        actions_path="pipeline/s2_WIN_20260326_15_06_23_Pro.json"
+        actions_path="pipeline/frame_predictions.json"
     )

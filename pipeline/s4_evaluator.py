@@ -82,8 +82,8 @@ if __name__ == "__main__":
     }
 
     evaluate_predictions(
-        predictions_path="pipeline/s2_WIN_20260326_15_06_23_Pro.json",
+        predictions_path="pipeline/frame_predictions.json",
         gt_path="pipeline/gt_WIN_20260326_15_06_23_Pro.json",
         class_mapping=my_grouping_map,
-        output_image="pipeline/eval_confusion_matrix.png"
+        output_image="pipeline/cnntransformer_eval_confusion_matrix.png"
     )
