@@ -141,5 +141,3 @@ pipeline/*.mp4
 pipeline/*.png
 pipeline/csv_input/*.mp4
 pipeline/csv_input/*.jpg
-
-up_dataset

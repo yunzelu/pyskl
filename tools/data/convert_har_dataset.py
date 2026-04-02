@@ -2,24 +2,45 @@ import os
 import json
 import pickle
 import numpy as np
-import random
+import re
 
 # ==========================================
 # CONFIGURATION
 # ==========================================
-DATA_ROOT = 'up_dataset'  # Folder containing 'Lying', 'Sitting', etc.
-OUTPUT_PKL = 'data/har/har.pkl'
-IMG_SHAPE = (640, 480)  # (Height, Width) - Replace with your video resolution
+DATA_ROOT = 'data/up_dataset'  
+OUTPUT_PKL = 'data/har/har_v1.1.pkl'
+IMG_SHAPE = (640, 480)  
 
-# Define your splits (must sum to <= 1.0)
-# Test set will automatically take whatever is leftover.
-TRAIN_RATIO = 0.60   # 60% for training
-VAL_RATIO = 0.15     # 15% for validation (tuning)
-CALIB_RATIO = 0.10   # 10% for conformal calibration
-# Remaining 15% will be used for testing
+# 1. CLASS MAPPING: Combine Standing and Walking here
+# This allows you to keep your 4 folders, but output 3 classes.
+CLASS_MAP = {
+    'Lying': 0,
+    'Sitting': 1,
+    'Standing': 2,
+    'Walking': 3  # Mapped to the same integer as Standing!
+}
 
-CLASSES = ['Lying', 'Sitting', 'Standing', 'Walking']
+# 2. CROSS-SUBJECT SPLIT: Define which subjects go where
+TRAIN_SUBJECTS = ['Subject1', 'Subject2', 'Subject13', 'Subject14', 'Subject15', 'Subject16', 'Subject17', 'Subject8', 'Subject9', 'Subject10', 'Subject11', 'Subject12']
+VAL_SUBJECTS   = ['Subject3', 'Subject4']
+CALIB_SUBJECTS = ['Subject5']
+TEST_SUBJECTS  = ['Subject6', 'Subject7']
 # ==========================================
+
+def extract_subject_id(filename):
+    """
+    Extracts the Subject ID from filenames like:
+    'Subject1Activity11Trial1Camera1_mirrored.json' -> Returns 'Subject1'
+    'Subject17Activity4Trial3Camera2.json' -> Returns 'Subject17'
+    """
+    # Searches for the word "Subject" followed by one or more digits (\d+)
+    match = re.search(r'(Subject\d+)', filename)
+    
+    if match:
+        return match.group(1) 
+    else:
+        # Failsafe in case a weird file sneaks into your folder
+        raise ValueError(f"Could not find a matching Subject ID in the file: {filename}")
 
 def load_json_sequence(json_path):
     with open(json_path, 'r') as f:
@@ -29,10 +50,7 @@ def load_json_sequence(json_path):
     V = 17
     C = 2
     
-    # Initialize with zeros
-    # Shape: [M, T, V, C] -> [1, T, 17, 2]
     keypoint = np.zeros((1, T, V, C), dtype=np.float32)
-    # Shape: [M, T, V] -> [1, T, 17]
     keypoint_score = np.zeros((1, T, V), dtype=np.float32)
     
     for t, frame_data in enumerate(data):
@@ -40,45 +58,37 @@ def load_json_sequence(json_path):
             kpts = np.array(frame_data['keypoints'], dtype=np.float32)
             scores = np.array(frame_data['scores'], dtype=np.float32)
             
-            # Ensure the frame has the right number of joints before assigning
             if kpts.shape[0] == V:
                 keypoint[0, t, :, :] = kpts
                 keypoint_score[0, t, :] = scores
-        else:
-            pass
-            
+                
     return keypoint, keypoint_score, T
 
-def build_dataset(data_root, classes, img_shape):
+def build_dataset(data_root, img_shape):
     annotations = []
-    # NEW: Added calib and test to the split dictionary
     split = {'train': [], 'val': [], 'calib': [], 'test': []}
     
-    for label_idx, class_name in enumerate(classes):
-        class_dir = os.path.join(data_root, class_name)
+    # Iterate over the folders we mapped
+    for class_folder, mapped_label_idx in CLASS_MAP.items():
+        class_dir = os.path.join(data_root, class_folder)
         if not os.path.isdir(class_dir):
-            print(class_dir + " doesn't exist")
+            print(f"{class_dir} doesn't exist, skipping.")
             continue
             
         files = [f for f in os.listdir(class_dir) if f.endswith('.json')]
-        random.shuffle(files)
         
-        total_files = len(files)
-        
-        # NEW: Calculate cutoff indices for the splits
-        train_end = int(total_files * TRAIN_RATIO)
-        val_end = train_end + int(total_files * VAL_RATIO)
-        calib_end = val_end + int(total_files * CALIB_RATIO)
-        
-        for i, file_name in enumerate(files):
+        for file_name in files:
             frame_dir = file_name.replace('.json', '')
             json_path = os.path.join(class_dir, file_name)
+            
+            # Extract subject ID to figure out which split this file belongs to
+            sub_id = extract_subject_id(file_name)
             
             keypoint, keypoint_score, total_frames = load_json_sequence(json_path)
             
             anno = {
                 'frame_dir': frame_dir,
-                'label': label_idx,
+                'label': mapped_label_idx, # Using the 3-class mapped integer
                 'img_shape': img_shape,
                 'original_shape': img_shape,
                 'total_frames': total_frames,
@@ -87,15 +97,17 @@ def build_dataset(data_root, classes, img_shape):
             }
             annotations.append(anno)
             
-            # NEW: Distribute files into the 4 buckets based on the calculated cutoffs
-            if i < train_end:
+            # Route the file to the correct split bucket based on Subject ID
+            if sub_id in TRAIN_SUBJECTS:
                 split['train'].append(frame_dir)
-            elif i < val_end:
+            elif sub_id in VAL_SUBJECTS:
                 split['val'].append(frame_dir)
-            elif i < calib_end:
+            elif sub_id in CALIB_SUBJECTS:
                 split['calib'].append(frame_dir)
-            else:
+            elif sub_id in TEST_SUBJECTS:
                 split['test'].append(frame_dir)
+            else:
+                print(f"Warning: Subject {sub_id} not found in any split lists. Skipping.")
                 
     return {'split': split, 'annotations': annotations}
 
@@ -109,8 +121,7 @@ def save_pkl(dataset_dict, output_path):
     print(f"Test samples:  {len(dataset_dict['split']['test'])}")
 
 def main():
-    # Pass the updated ratios implicitly via the global variables
-    dataset_dict = build_dataset(DATA_ROOT, CLASSES, IMG_SHAPE)
+    dataset_dict = build_dataset(DATA_ROOT, IMG_SHAPE)
     save_pkl(dataset_dict, OUTPUT_PKL)
 
 if __name__ == '__main__':
