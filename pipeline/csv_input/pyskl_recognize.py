@@ -56,9 +56,9 @@ if __name__ == "__main__":
     action_results = run_action_recognition(
         windows=windows,
         config_path="configs/stgcn++/har4_j.py",
-        checkpoint_path="work_dirs/stgcn++/har4_j/epoch_16.pth",
+        checkpoint_path="work_dirs/stgcn++/har_v1.1/epoch_16.pth",
         label_map_path="tools/data/label_map/har4.txt"
     )
 
-    with open("pipeline/csv_input/12-12_result.json", "w") as f:
+    with open("pipeline/csv_input/12-12_result_v1.1.json", "w") as f:
         json.dump(action_results, f, indent=4)
