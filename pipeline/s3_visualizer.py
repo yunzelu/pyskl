@@ -19,11 +19,19 @@ def load_processed_data(poses_path, actions_path):
     return poses_by_frame, actions_data
 
 def get_action_label(actions_data, track_id, frame_idx):
-    """Find the specific action prediction for a person in the current frame."""
+    """
+    Find the action prediction. If overlapping windows exist, 
+    we take the LAST (most recent) one for the most updated context.
+    """
+    matches = []
     for act in actions_data:
-        if act["track_id"] == track_id and act["start_frame"] <= frame_idx < act["end_frame"]:
-            return f"{act['action']} {act['confidence']:.2f}"
-    return None
+        # Match PersonID and check if current time falls within the window
+        if int(act["track_id"]) == track_id and act["start_frame"] <= frame_idx <= act["end_frame"]:
+            matches.append(act)
+            
+    if matches:
+        latest_act = matches[-1] # Grab the most recent overlapping window
+        return f"{latest_act['action']} {latest_act['confidence']:.2f}"
 
 def run_official_visualizer(video_in, video_out, poses_path, actions_path):
     poses_by_frame, actions_data = load_processed_data(poses_path, actions_path)
