@@ -124,8 +124,8 @@ def run_csv_visualizer(bg_image_path, video_out, poses_path, actions_path, fps=3
 if __name__ == "__main__":
     run_csv_visualizer(
         bg_image_path="pipeline/csv_input/WIN_20260313_15_30_37_Pro.jpg", 
-        video_out="pipeline/csv_input/12-12_rendered_v1.1.mp4",
-        poses_path="pipeline/csv_input/12-12_padded_corrected.csv",
-        actions_path="pipeline/csv_input/12-12_result_v1.1.json",
+        video_out="pipeline/csv_input/12-12_rendered.mp4",
+        poses_path="pipeline/csv_input/12-12_padded.csv",
+        actions_path="pipeline/csv_input/12-12_result_corrected.json",
         fps=30 
     )
