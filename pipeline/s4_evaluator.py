@@ -91,7 +91,7 @@ if __name__ == "__main__":
     }
 
     evaluate_predictions(
-        predictions_path="pipeline/s2_cnntransformer.json",
+        predictions_path="pipeline/pc.json",
         gt_path="pipeline/gt_WIN_20260326_15_06_23_Pro.json",
         class_mapping=my_grouping_map
     )

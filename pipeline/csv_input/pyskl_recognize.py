@@ -60,5 +60,5 @@ if __name__ == "__main__":
         label_map_path="tools/data/label_map/har4.txt"
     )
 
-    with open("pipeline/csv_input/12-12_result_v1.1.json", "w") as f:
+    with open("pipeline/csv_input/12-12_result.json", "w") as f:
         json.dump(action_results, f, indent=4)

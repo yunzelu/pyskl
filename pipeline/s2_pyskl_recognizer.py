@@ -55,7 +55,7 @@ if __name__ == "__main__":
     action_results = run_action_recognition(
         windows=windows,
         config_path="configs/stgcn++/har4_j.py",
-        checkpoint_path="work_dirs/stgcn++/har4_j/epoch_16.pth",
+        checkpoint_path="work_dirs/stgcn++/har_v1.1/epoch_16.pth",
         label_map_path="tools/data/label_map/har4.txt"
     )
 
