@@ -67,8 +67,8 @@ def create_windows(csv_path, window_size=60, stride=30, num_joints=17):
             fake_anno = dict(
                 frame_dir='',
                 label=-1,
-                img_shape=(352, 640), # Replace with your actual video dimensions
-                original_shape=(352, 640),
+                img_shape=(720, 1280), # Replace with your actual video dimensions
+                original_shape=(720, 1280),
                 start_index=0,
                 modality='Pose',
                 total_frames=window_size,
