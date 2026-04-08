@@ -42,8 +42,10 @@ def process_label_folder(input_folder, label_name, output_json_path, weight_path
                 persist=True, 
                 classes=[0], 
                 verbose=False, 
-                tracker="bytetrack.yaml",
-                device=device
+                tracker="tools/data/radar_dataset/custom_bytetrack.yaml",
+                device=device,
+                max_det=1, # strictly limits output to the 1 best person
+                conf=0.3   # Increase from the 0.25 default to ensure high-quality bounding boxes
             )
             
             # Check if any persons were detected and tracked
