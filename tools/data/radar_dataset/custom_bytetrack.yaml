@@ -2,4 +2,6 @@ tracker_type: bytetrack
 track_high_thresh: 0.3  # Increased from 0.25. Requires a high-quality detection to associate a track.
 track_low_thresh: 0.2   # Increased from 0.1. Rejects highly occluded/noisy frames.
 new_track_thresh: 0.3   # Increased from 0.25. 
-match_thresh: 0.8
+track_buffer: 30        # Frames to keep a lost track alive before removing
+match_thresh: 0.8       # Threshold for matching tracks
+fuse_score: True        # Fuses detection confidence with spatial distance for matching

@@ -138,7 +138,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Filter low-confidence poses, trim edges, and pad internal gaps.")
     
     parser.add_argument("-i", "--input", type=str, required=True, help="Path to original raw JSON.")
-    # parser.add_argument("-o", "--output", type=str, required=True, help="Path to save cleaned JSON.")
+    parser.add_argument("-o", "--output", type=str, required=True, help="Path to save cleaned JSON.")
     parser.add_argument("-g", "--gap_threshold", type=int, default=15, 
                         help="Max allowed continuous zero frames before clip is dropped. Default: 15")
     parser.add_argument("-s", "--score_thresh", type=float, default=0.5, 
@@ -147,5 +147,5 @@ if __name__ == "__main__":
                         help="Number of keypoints below score_thresh required to zero out the frame. Default: 9")
     
     args = parser.parse_args()
-    output = args.input.split(".")[0] + "_clean.json"
-    clean_and_pad_dataset(args.input, output, args.gap_threshold, args.score_thresh, args.low_score_limit)
+    # output = args.input.split(".")[0] + "_clean.json"
+    clean_and_pad_dataset(args.input, args.output, args.gap_threshold, args.score_thresh, args.low_score_limit)
