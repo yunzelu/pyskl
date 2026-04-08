@@ -1,15 +1,16 @@
 import os
 import cv2
 import json
+import argparse
 import numpy as np
 from ultralytics import YOLO
 
-def process_label_folder(input_folder, label_name, output_json_path, weight_path="yolo26.pt"):
+def process_label_folder(input_folder, label_name, output_json_path, weight_path="yolo26.pt", device=0):
     """
     Runs YOLO pose estimation with tracking on all clips in a specific label folder.
     Saves the output to a JSON file structured for easy conversion to PYSKL format.
     """
-    print(f"Loading YOLO model from: {weight_path}...")
+    print(f"Loading YOLO model from: {weight_path} on device: {device}...")
     model = YOLO(weight_path)
     
     dataset_info = []
@@ -35,8 +36,15 @@ def process_label_folder(input_folder, label_name, output_json_path, weight_path
             if not ret:
                 break
                 
-            # Run YOLO with tracking, restrict to class 0 (person), hide verbose logging
-            results = model.track(frame, persist=True, classes=[0], verbose=False, tracker="bytetrack.yaml")
+            # Run YOLO with tracking, restrict to class 0 (person), force device
+            results = model.track(
+                frame, 
+                persist=True, 
+                classes=[0], 
+                verbose=False, 
+                tracker="bytetrack.yaml",
+                device=device
+            )
             
             # Check if any persons were detected and tracked
             if results[0].boxes is not None and results[0].boxes.id is not None:
@@ -58,18 +66,14 @@ def process_label_folder(input_folder, label_name, output_json_path, weight_path
             
         cap.release()
         
-        # total_frames is the exact number of frames we actually read
         total_frames = frame_idx 
         
-        # Number of keypoints (V). COCO format usually has 17.
-        # Fallback to 17 if no detections were made in the entire video.
         num_kpts = 17 
         if tracks_data:
             first_tid = list(tracks_data.keys())[0]
             first_frame_with_data = list(tracks_data[first_tid]['kpts'].keys())[0]
             num_kpts = len(tracks_data[first_tid]['kpts'][first_frame_with_data])
 
-        # Format the collected data into strict temporal arrays of length T (total_frames)
         persons = []
         for tid, data in tracks_data.items():
             person_kpts = []
@@ -82,19 +86,17 @@ def process_label_folder(input_folder, label_name, output_json_path, weight_path
                     person_scores.append(data['scores'][i])
                     person_bboxes.append(data['bboxes'][i])
                 else:
-                    # Pad with zeros if the person was lost or not yet in the frame
                     person_kpts.append([[0.0, 0.0]] * num_kpts)
                     person_scores.append([0.0] * num_kpts)
                     person_bboxes.append([0.0, 0.0, 0.0, 0.0])
                     
             persons.append({
-                "person_id": tid,
-                "keypoints": person_kpts,         # Final shape: [T, V, 2]
-                "keypoint_scores": person_scores, # Final shape: [T, V]
-                "bboxes": person_bboxes           # Final shape: [T, 4]
+                "person_id": int(tid), # Cast to int natively for clean JSON
+                "keypoints": person_kpts,
+                "keypoint_scores": person_scores,
+                "bboxes": person_bboxes
             })
 
-        # Append this clip's structured data to the dataset
         dataset_info.append({
             "frame_dir": video_file,
             "label": label_name,
@@ -104,25 +106,41 @@ def process_label_folder(input_folder, label_name, output_json_path, weight_path
             "persons": persons
         })
 
-    # Save the label's dataset to JSON
     os.makedirs(os.path.dirname(output_json_path), exist_ok=True)
     with open(output_json_path, 'w') as f:
         json.dump(dataset_info, f, indent=4)
         
     print(f"\nSaved tracking data for {len(dataset_info)} clips to {output_json_path}")
 
-
 # ==========================================
-# Execution
+# Command Line Interface
 # ==========================================
-# Example usage for one specific label folder:
-input_label_dir = "data/radar_dataset/LayBed-Stationary"
-output_file = "data/radar_dataset/LayBed-Stationary.json"
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Extract YOLO skeletons and save to PYSKL-compatible JSON.")
+    
+    # Required arguments
+    parser.add_argument("-i", "--input_folder", type=str, required=True, 
+                        help="Path to the folder containing video clips (e.g., .../Transition-Stand-to-Sit).")
+    parser.add_argument("-l", "--label", type=str, required=True, 
+                        help="The action label name for these clips (e.g., Transition-Stand-to-Sit).")
+    parser.add_argument("-o", "--output_file", type=str, required=True, 
+                        help="Path to the output JSON file.")
+    
+    # Optional arguments
+    parser.add_argument("-w", "--weight", type=str, default="checkpoints/yolo26x-pose.pt", 
+                        help="Path to the YOLO model weights. Default: checkpoints/yolo26x-pose.pt")
+    parser.add_argument("-d", "--device", type=str, default="cpu", 
+                        help="GPU device ID (e.g., '0' or '1') or 'cpu'. Default: cpu")
+    
+    args = parser.parse_args()
+    
+    # Handle passing numeric IDs (like 0) vs strings (like 'cpu') to the device parameter safely
+    device_val = int(args.device) if args.device.isdigit() else args.device
 
-# Note: Ensure you have your custom "yolo26.pt" or standard "yolov8n-pose.pt" in the path
-process_label_folder(
-    input_folder=input_label_dir, 
-    label_name="LayBed-Stationary", 
-    output_json_path=output_file,
-    weight_path="d:/lu/project/har/yolo/yolo26x-pose.pt" 
-)
+    process_label_folder(
+        input_folder=args.input_folder, 
+        label_name=args.label, 
+        output_json_path=args.output_file,
+        weight_path=args.weight,
+        device=device_val
+    )
