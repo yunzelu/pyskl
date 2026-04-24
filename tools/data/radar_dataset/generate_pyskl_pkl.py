@@ -48,10 +48,10 @@ def generate_pyskl_pkl(json_folder, output_pkl, seed=42):
     random.seed(seed)
     random.shuffle(subjects_list)
 
-    train_subs = set(subjects_list[0:8])
-    valid_subs = set(subjects_list[8:9])
-    test_subs  = set(subjects_list[9:10])
-    calib_subs = set(subjects_list[10:11])
+    train_subs = set(subjects_list[0:9])
+    valid_subs = set(subjects_list[9:10])
+    test_subs  = set(subjects_list[10:11])
+    # calib_subs = set(subjects_list[10:11])
 
     # 4. Build the PYSKL Data Structure
     pyskl_data = {
@@ -80,8 +80,8 @@ def generate_pyskl_pkl(json_folder, output_pkl, seed=42):
             target_split = 'valid'
         elif subject_id in test_subs:
             target_split = 'test'
-        elif subject_id in calib_subs:
-            target_split = 'calibration'
+        # elif subject_id in calib_subs:
+        #     target_split = 'calibration'
         else:
             continue 
 
@@ -137,7 +137,7 @@ def generate_pyskl_pkl(json_folder, output_pkl, seed=42):
     print(f"  - Training clips:    {split_counts['train']} (Subjects: {len(train_subs)})")
     print(f"  - Validation clips:  {split_counts['valid']} (Subjects: {len(valid_subs)})")
     print(f"  - Testing clips:     {split_counts['test']} (Subjects: {len(test_subs)})")
-    print(f"  - Calibration clips: {split_counts['calibration']} (Subjects: {len(calib_subs)})")
+    # print(f"  - Calibration clips: {split_counts['calibration']} (Subjects: {len(calib_subs)})")
     print("-" * 40)
     print(f"Pickle file saved to: {output_pkl}")
     print(f"Label map saved to:   {map_path}")
