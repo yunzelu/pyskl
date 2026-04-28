@@ -550,3 +550,14 @@ class DecompressPose:
 
     def __repr__(self):
         return (f'{self.__class__.__name__}(squeeze={self.squeeze}, max_person={self.max_person})')
+
+@PIPELINES.register_module()
+class DropScoreChannel:
+    """Custom pipeline to keep only x and y channels."""
+    def __call__(self, results):
+        if 'keypoint' in results:
+            # The tensor shape here is [M, T, V, C]
+            # Using '...' tells Python to keep M, T, and V exactly the same.
+            # ':2' on the last dimension drops the 3rd channel (the score).
+            results['keypoint'] = results['keypoint'][..., :2]
+        return results

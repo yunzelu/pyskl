@@ -21,10 +21,16 @@ def generate_pyskl_pkl(json_folder, output_pkl, seed=42):
     for j_file in json_files:
         with open(os.path.join(json_folder, j_file), 'r') as f:
             data = json.load(f)
-            all_clips.extend(data)
             
             for clip in data:
+                # --- MODIFICATION 1: Combine the Lying classes ---
+                if clip['label'] in ['LayBed-Stationary', 'LayFloor-Stationary']:
+                    clip['label'] = 'Lying'
+                # -------------------------------------------------
+                
+                all_clips.append(clip)
                 unique_labels.add(clip['label'])
+                
                 # Extract subject from our naming convention: "subjectID_folderName_frame.avi"
                 subject_id = clip['frame_dir'].split('_')[0]
                 unique_subjects.add(subject_id)
@@ -38,7 +44,7 @@ def generate_pyskl_pkl(json_folder, output_pkl, seed=42):
         print(f"{idx}: {label}")
     print("--------------------------------\n")
 
-    # 3. Perform 8-1-1-1 Cross-Subject Split
+    # 3. Perform Cross-Subject Split (No Calibration Set)
     subjects_list = sorted(list(unique_subjects))
     print(f"Found {len(subjects_list)} unique subjects: {subjects_list}")
     
@@ -48,18 +54,18 @@ def generate_pyskl_pkl(json_folder, output_pkl, seed=42):
     random.seed(seed)
     random.shuffle(subjects_list)
 
-    train_subs = set(subjects_list[0:8])
-    valid_subs = set(subjects_list[8:9])
-    test_subs  = set(subjects_list[9:10])
-    calib_subs = set(subjects_list[10:11])
+    # --- MODIFICATION 2: 9 Train, 1 Valid, 1 Test ---
+    train_subs = set(subjects_list[0:9])
+    valid_subs = set(subjects_list[9:10])
+    test_subs  = set(subjects_list[10:]) # Takes all remaining subjects
+    # ----------------------------------------------------------------
 
     # 4. Build the PYSKL Data Structure
     pyskl_data = {
         'split': {
             'train': [],
             'valid': [],
-            'test': [],
-            'calibration': []
+            'test': [] # Removed calibration
         },
         'annotations': []
     }
@@ -67,7 +73,7 @@ def generate_pyskl_pkl(json_folder, output_pkl, seed=42):
     print("\nFormatting arrays to [M, T, V, C] and verifying dimensions...")
 
     # Counters to verify the split distribution
-    split_counts = {'train': 0, 'valid': 0, 'test': 0, 'calibration': 0}
+    split_counts = {'train': 0, 'valid': 0, 'test': 0}
 
     for clip in all_clips:
         clip_name = clip['frame_dir']
@@ -80,8 +86,6 @@ def generate_pyskl_pkl(json_folder, output_pkl, seed=42):
             target_split = 'valid'
         elif subject_id in test_subs:
             target_split = 'test'
-        elif subject_id in calib_subs:
-            target_split = 'calibration'
         else:
             continue 
 
@@ -95,8 +99,6 @@ def generate_pyskl_pkl(json_folder, output_pkl, seed=42):
         scores_array = np.array([p['keypoint_scores'] for p in clip['persons']], dtype=np.float16)
 
         # STRICT DIMENSION CHECK: Ensure T matches total_frames
-        # kpts_array shape should be [M, T, 17, 2]. 
-        # kpts_array.shape[1] is the temporal dimension (T).
         actual_t = kpts_array.shape[1]
         
         if actual_t != total_frames:
@@ -137,7 +139,6 @@ def generate_pyskl_pkl(json_folder, output_pkl, seed=42):
     print(f"  - Training clips:    {split_counts['train']} (Subjects: {len(train_subs)})")
     print(f"  - Validation clips:  {split_counts['valid']} (Subjects: {len(valid_subs)})")
     print(f"  - Testing clips:     {split_counts['test']} (Subjects: {len(test_subs)})")
-    print(f"  - Calibration clips: {split_counts['calibration']} (Subjects: {len(calib_subs)})")
     print("-" * 40)
     print(f"Pickle file saved to: {output_pkl}")
     print(f"Label map saved to:   {map_path}")
@@ -147,7 +148,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Combine YOLO JSONs into a PYSKL cross-subject pickle dataset.")
     parser.add_argument("-i", "--input_folder", type=str, required=True, help="Folder containing cleaned JSONs.")
     parser.add_argument("-o", "--output_pkl", type=str, required=True, help="Path for final .pkl file.")
-    parser.add_argument("-s", "--seed", type=int, default=42, help="Random seed for the 8:1:1:1 split.")
+    parser.add_argument("-s", "--seed", type=int, default=42, help="Random seed for the split.")
     
     args = parser.parse_args()
     generate_pyskl_pkl(args.input_folder, args.output_pkl, args.seed)

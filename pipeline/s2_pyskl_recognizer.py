@@ -49,14 +49,14 @@ def run_action_recognition(windows, config_path, checkpoint_path, label_map_path
 
 if __name__ == "__main__":
     # 1. Get windows from the bridge
-    windows = create_windows("pipeline/WIN_20260326_15_06_23_Pro.json", window_size=60, stride=30)
+    windows = create_windows("pipeline/pose.json", window_size=60, stride=30)
     
     # 2. Run ST-GCN++ 
     action_results = run_action_recognition(
         windows=windows,
-        config_path="configs/stgcn++/har4_j.py",
-        checkpoint_path="work_dirs/stgcn++/har_v1.1/epoch_16.pth",
-        label_map_path="tools/data/label_map/har4.txt"
+        config_path="configs/stgcn++/radar_j.py",
+        checkpoint_path="work_dirs/stgcn++/radar/epoch_16.pth",
+        label_map_path="tools/data/label_map/radar.txt"
     )
 
     with open("pipeline/pc.json", "w") as f:
