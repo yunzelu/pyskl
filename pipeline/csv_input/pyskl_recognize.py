@@ -50,15 +50,15 @@ def run_action_recognition(windows, config_path, checkpoint_path, label_map_path
 
 if __name__ == "__main__":
     # 1. Get windows from the bridge (Make sure to point to your CSV file now!)
-    windows = create_windows("pipeline/csv_input/yolo_pose_2026-03-14 copy.csv", window_size=60, stride=30)
+    windows = create_windows("pipeline/csv_input/pose_2026-04-18_310_p.csv", window_size=45, stride=15)
     
     # 2. Run ST-GCN++ 
     action_results = run_action_recognition(
         windows=windows,
-        config_path="configs/stgcn++/radar_j.py",
-        checkpoint_path="work_dirs/stgcn++/radar/epoch_16.pth",
-        label_map_path="tools/data/label_map/radar.txt"
+        config_path="configs/stgcn++/radar_j_2.py",
+        checkpoint_path="work_dirs/stgcn++/radar2/epoch_13.pth",
+        label_map_path="tools/data/label_map/radar2.txt"
     )
 
-    with open("pipeline/csv_input/yolo_pose_2026-03-14_copy_result.json", "w") as f:
+    with open("pipeline/csv_input/pose_2026-04-18_310_p_r.json", "w") as f:
         json.dump(action_results, f, indent=4)

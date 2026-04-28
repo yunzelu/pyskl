@@ -17,7 +17,7 @@ def create_windows(csv_path, window_size=60, stride=30, num_joints=17):
     max_frame = len(unique_times) - 1
     
     for row in data:
-        tid = row['PersonID']
+        tid = row['ID']
         # Convert UnixTime to our synthetic sequential frame_id
         unix_time = float(row['UnixTime'])
         fid = time_to_frame[unix_time]

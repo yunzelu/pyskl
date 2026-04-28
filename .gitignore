@@ -141,5 +141,4 @@ pipeline/*.mp4
 pipeline/*.png
 pipeline/csv_input/*.mp4
 pipeline/csv_input/*.jpg
-
-pipeline/*.csv
+pipeline/csv_input/*.csv
