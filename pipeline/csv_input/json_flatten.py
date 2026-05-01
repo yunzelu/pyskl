@@ -83,7 +83,7 @@ def flatten_to_continuous_timeline(input_json, output_json):
 
 if __name__ == "__main__":
     # Point this to the output JSON from your inference script
-    input_file = "pipeline/csv_input/12-12_result.json"
-    output_file = "pipeline/csv_input/12-12_continuous_timeline.json"
+    input_file = "pipeline/csv_input/pose_2026-04-18_310_p_r.json"
+    output_file = "pipeline/csv_input/pose_2026-04-18_310_p_r_f.json"
     
     flatten_to_continuous_timeline(input_file, output_file)
