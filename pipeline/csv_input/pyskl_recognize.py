@@ -56,7 +56,7 @@ if __name__ == "__main__":
     action_results = run_action_recognition(
         windows=windows,
         config_path="configs/stgcn++/radar_j_2.py",
-        checkpoint_path="work_dirs/stgcn++/radar2/epoch_13.pth",
+        checkpoint_path="work_dirs/stgcn++/radar2/epoch_16.pth",
         label_map_path="tools/data/label_map/radar2.txt"
     )
 
