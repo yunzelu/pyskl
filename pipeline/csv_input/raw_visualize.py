@@ -1,5 +1,4 @@
 import cv2
-import json
 import torch
 import numpy as np
 import pandas as pd
@@ -7,14 +6,9 @@ import argparse
 from tqdm import tqdm
 from ultralytics.utils.plotting import Annotator, colors
 
-def render_skeletons_from_csv(csv_path, json_path, image_path, video_out, view_size=(1920, 1080), fps=30):
-    # 1. Read the CSV data and Inference JSON
-    print(f"Loading CSV data from: {csv_path}")
+def render_skeletons_from_csv(csv_path, image_path, video_out, view_size=(1920, 1080), fps=30):
+    # 1. Read the CSV data
     df = pd.read_csv(csv_path)
-    
-    print(f"Loading Inference JSON from: {json_path}")
-    with open(json_path, 'r') as f:
-        inference_data = json.load(f)
     
     # Check if the new bounding box columns exist in this CSV
     bbox_cols = ['BBox_X1', 'BBox_Y1', 'BBox_X2', 'BBox_Y2']
@@ -45,16 +39,16 @@ def render_skeletons_from_csv(csv_path, json_path, image_path, video_out, view_s
     # 2. Setup VideoWriter
     out = cv2.VideoWriter(video_out, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
     
-    print(f"Baking native YOLO-style render on background to: {video_out}")
+    print(f"Baking native YOLO-style render on black background to: {video_out}")
     print(f"Configured Canvas Size: {w}x{h}")
 
     # 3. Iterate through frames with a progress bar
     for _, row in tqdm(unique_timestamps.iterrows(), total=len(unique_timestamps), desc="Rendering frames"):
         # Safely grab the dual timestamps
         timestamp = row.get('Timestamp', '')
-        unix_time = float(row.get('UnixTime', 0.0))
+        unix_time = row.get('UnixTime', 0.0)
         
-        # Create a blank background frame
+        # Create a blank black frame
         frame = bg_resized.copy()
         
         # Initialize YOLO annotator
@@ -69,26 +63,6 @@ def render_skeletons_from_csv(csv_path, json_path, image_path, video_out, view_s
         for _, person in people_in_frame.iterrows():
             pid = int(person.get('ID', person.get('PersonID', 0)))
             
-            # --- MODIFICATION: Find the action label for this person at this time ---
-            active_windows = [
-                w for w in inference_data 
-                if int(w['track_id']) == pid and w['start_unix_time'] <= unix_time <= w['end_unix_time']
-            ]
-            
-            if active_windows:
-                # Sort by start time, so the last element is the newest overlapping window
-                active_windows.sort(key=lambda x: x['start_unix_time'])
-                current_action = active_windows[-1]['action']
-                
-                # Extract confidence, defaulting to 0.0 if not found
-                confidence = active_windows[-1].get('confidence', 0.0)
-                
-                # Format label with action and confidence to 2 decimal places
-                label_text = f"ID: {pid} | {current_action} ({confidence:.2f})"
-            else:
-                label_text = f"ID: {pid} | No Action"
-            # ------------------------------------------------------------------------
-
             # Extract keypoints into shape (17, 3) -> [x, y, conf]
             kpts_data = []
             for i in range(17):
@@ -126,9 +100,8 @@ def render_skeletons_from_csv(csv_path, json_path, image_path, video_out, view_s
                         min(h, int(max_y + padding))
                     ]
             
-            # Apply the new label text to the bounding box
             if box is not None and pid != -1:
-                annotator.box_label(box, label_text, color=colors(pid, True))
+                annotator.box_label(box, f"ID: {pid}", color=colors(pid, True))
             
             # 5. Draw the native YOLO skeleton
             kpts_tensor = torch.tensor(kpts_array)
@@ -137,15 +110,17 @@ def render_skeletons_from_csv(csv_path, json_path, image_path, video_out, view_s
         # Get the annotated frame
         final_frame = annotator.result()
         
-        # 6. Add Timestamp and UnixTime to the BOTTOM-LEFT corner
+        # 6. Add Timestamp and UnixTime to the BOTTOM-RIGHT corner
         text_str = f"Time: {timestamp} | Unix: {unix_time}"
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.5   
-        thickness = 1      
+        font_scale = 0.5   # Scaled down from 1.0
+        thickness = 1      # Scaled down from 2
         
+        # Calculate the size of the text to offset it from the bottom-right edges
         text_size, _ = cv2.getTextSize(text_str, font, font_scale, thickness)
         text_w, text_h = text_size
         
+        # Set a 15-pixel margin from the bottom and left edges
         margin = 15
         text_x = margin
         text_y = h - margin
@@ -159,29 +134,19 @@ def render_skeletons_from_csv(csv_path, json_path, image_path, video_out, view_s
     print("Video saved successfully.")
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Render YOLO Skeletons with Inference Results")
-    
-    # Required paths
-    parser.add_argument('--csv-path', type=str, required=True, help="Path to the input CSV pose data")
-    parser.add_argument('--json-path', type=str, required=True, help="Path to the inference JSON file")
+    parser = argparse.ArgumentParser(description="Render YOLO Skeletons without Inference")
+    parser.add_argument('--csv-path', type=str, required=True, help="Path to the input CSV data")
     parser.add_argument('--image-path', type=str, required=True, help="Path to the background layout image")
     parser.add_argument('--video-out', type=str, required=True, help="Path to save the output MP4 video")
-    
-    # Optional settings
     parser.add_argument('--width', type=int, default=1280, help="Canvas width (default: 1280)")
     parser.add_argument('--height', type=int, default=720, help="Canvas height (default: 720)")
     parser.add_argument('--fps', type=int, default=30, help="Video frames per second (default: 30)")
-    
     return parser.parse_args()
 
 if __name__ == "__main__":
-    # Parse arguments from the command line
     args = parse_args()
-    
-    # Run the render function with the parsed arguments
     render_skeletons_from_csv(
         csv_path=args.csv_path,
-        json_path=args.json_path,
         image_path=args.image_path,
         video_out=args.video_out,
         view_size=(args.width, args.height),
