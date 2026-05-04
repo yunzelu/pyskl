@@ -79,7 +79,12 @@ def render_skeletons_from_csv(csv_path, json_path, image_path, video_out, view_s
                 # Sort by start time, so the last element is the newest overlapping window
                 active_windows.sort(key=lambda x: x['start_unix_time'])
                 current_action = active_windows[-1]['action']
-                label_text = f"ID: {pid} | {current_action}"
+                
+                # Extract confidence, defaulting to 0.0 if not found
+                confidence = active_windows[-1].get('confidence', 0.0)
+                
+                # Format label with action and confidence to 2 decimal places
+                label_text = f"ID: {pid} | {current_action} ({confidence:.2f})"
             else:
                 label_text = f"ID: {pid} | No Action"
             # ------------------------------------------------------------------------
