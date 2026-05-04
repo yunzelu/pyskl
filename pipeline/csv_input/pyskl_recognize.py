@@ -1,3 +1,4 @@
+import argparse
 import mmcv
 import torch
 from pyskl.apis import init_recognizer, inference_recognizer
@@ -48,17 +49,47 @@ def run_action_recognition(windows, config_path, checkpoint_path, label_map_path
         
     return action_results
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run PySKL ST-GCN++ Inference for InvisiGuard")
+    
+    # Required arguments
+    parser.add_argument('--csv-path', type=str, required=True, help="Path to the input CSV file containing YOLO pose data")
+    parser.add_argument('--out-json', type=str, required=True, help="Path where the output JSON will be saved")
+    parser.add_argument('--config', type=str, required=True, help="Path to the PySKL config (.py) file")
+    parser.add_argument('--checkpoint', type=str, required=True, help="Path to the trained model weights (.pth)")
+    parser.add_argument('--label-map', type=str, required=True, help="Path to the label map text file")
+    
+    # Optional arguments with default values
+    parser.add_argument('--window-size', type=int, default=100, help="Clip length for the model (default: 100)")
+    parser.add_argument('--stride', type=int, default=30, help="Stride step for sliding window (default: 30)")
+    
+    return parser.parse_args()
+
 if __name__ == "__main__":
-    # 1. Get windows from the bridge (Make sure to point to your CSV file now!)
-    windows = create_windows("/mnt/d/lu/project/auto_labeling_pipeline/data/Willowbend/310/pose_2026-04-27_p.csv", window_size=100, stride=30)
+    # Parse the command-line arguments
+    args = parse_args()
+
+    print(f"Loading data from {args.csv_path}...")
+    print(f"Using Window Size: {args.window_size}, Stride: {args.stride}")
+
+    # 1. Get windows from the bridge using the parsed arguments
+    windows = create_windows(
+        csv_path=args.csv_path, 
+        window_size=args.window_size, 
+        stride=args.stride
+    )
     
     # 2. Run ST-GCN++ 
+    print("Starting ST-GCN++ inference...")
     action_results = run_action_recognition(
         windows=windows,
-        config_path="/mnt/d/lu/project/pyskl/configs/stgcn++/radar_j_2.py",
-        checkpoint_path="/mnt/d/lu/project/pyskl/work_dirs/stgcn++/radar2/epoch_16.pth",
-        label_map_path="/mnt/d/lu/project/pyskl/tools/data/label_map/radar2.txt"
+        config_path=args.config,
+        checkpoint_path=args.checkpoint,
+        label_map_path=args.label_map
     )
 
-    with open("/mnt/d/lu/project/auto_labeling_pipeline/data/Willowbend/310/pose_2026-04-27_p_r.json", "w") as f:
+    # 3. Save the results to the specified output path
+    with open(args.out_json, "w") as f:
         json.dump(action_results, f, indent=4)
+        
+    print(f"Inference complete! Results successfully saved to: {args.out_json}")
