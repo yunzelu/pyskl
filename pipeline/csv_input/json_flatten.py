@@ -1,4 +1,5 @@
 import json
+import argparse
 
 def flatten_to_continuous_timeline(input_json, output_json):
     print(f"Loading inference data from: {input_json}")
@@ -81,9 +82,12 @@ def flatten_to_continuous_timeline(input_json, output_json):
     print(f"Saved to: {output_json}")
     print("="*50)
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Flatten overlapping JSON action windows into a continuous timeline.")
+    parser.add_argument('--input-json', type=str, required=True, help="Path to the input JSON file (from inference)")
+    parser.add_argument('--output-json', type=str, required=True, help="Path to save the flattened JSON output")
+    return parser.parse_args()
+
 if __name__ == "__main__":
-    # Point this to the output JSON from your inference script
-    input_file = "pipeline/csv_input/pose_2026-04-18_310_p_r.json"
-    output_file = "pipeline/csv_input/pose_2026-04-18_310_p_r_f.json"
-    
-    flatten_to_continuous_timeline(input_file, output_file)
+    args = parse_args()
+    flatten_to_continuous_timeline(args.input_json, args.output_json)

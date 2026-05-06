@@ -1,4 +1,5 @@
 import json
+import argparse
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from datetime import datetime, timedelta, timezone
@@ -15,17 +16,20 @@ def generate_gantt_chart(json_path, output_image_path):
     # 1. Update the configuration to match our new HAR taxonomy
     # Levels dictate the vertical position (higher number = higher on the chart)
     config = {
-        "Walking":                      {"level": 10, "color": "#2ecc71"}, # Green
-        "Transition-LayFloor-to-Stand": {"level": 9,  "color": "#e67e22"}, # Orange
-        "Transition-Sit-to-Stand":      {"level": 8,  "color": "#f39c12"}, # Light Orange
-        "Transition-Stand-to-Sit":      {"level": 7,  "color": "#f1c40f"}, # Yellow
-        "Transition-LayBed-to-Sit":     {"level": 6,  "color": "#f3ce70"}, # Light Yellow
-        "Sit-Stationary":               {"level": 5,  "color": "#1abc9c"}, # Teal
-        "Transition-Sit-to-LayBed":     {"level": 4,  "color": "#5dade2"}, # Light Blue
-        "Lying":                        {"level": 3,  "color": "#2980b9"}, # Dark Blue
+        "Walking":                      {"level": 9,  "color": "#2ecc71"}, # Green
+        "Transition-LayFloor-to-Stand": {"level": 8,  "color": "#e67e22"}, # Orange
+        "Transition-Sit-to-Stand":      {"level": 7,  "color": "#f39c12"}, # Light Orange
+        "Transition-Stand-to-Sit":      {"level": 6,  "color": "#f1c40f"}, # Yellow
+        "Transition-LayBed-to-Sit":     {"level": 5,  "color": "#f3ce70"}, # Light Yellow
+        "Sit-Stationary":               {"level": 4,  "color": "#1abc9c"}, # Teal
+        "Transition-Sit-to-LayBed":     {"level": 3,  "color": "#5dade2"}, # Light Blue
         "Falling":                      {"level": 2,  "color": "#e74c3c"}, # Red (CRITICAL)
         "Multiperson":                  {"level": 1,  "color": "#9b59b6"}, # Purple
-        "No detection":                 {"level": 0,  "color": "#bdc3c7"}  # Grey
+        # "No detection":                 {"level": 0,  "color": "#bdc3c7"}, # Grey
+        "Out-of-Room":                  {"level": 0,  "color": "#bdc3c7"}, # Grey
+        # "Lying":                        {"level": 10, "color": "#2980b9"}, # Dark Blue
+        "LayBed-Stationary":            {"level": 10, "color": "#2980b9"},
+        "LayFloor-Stationary":          {"level": 11, "color": "#2980b9"},
     }
 
     # Define EDT timezone (UTC-4)
@@ -37,15 +41,18 @@ def generate_gantt_chart(json_path, output_image_path):
     # 2. Process each block in the flattened timeline
     for entry in data:
         # Use the new keys from our flatten script
-        label = entry['label']
+        # label = entry['label']
+        label = entry['action']
         
         # Fallback just in case an unknown label appears
         if label not in config:
             continue
             
         # Convert Unix timestamps to UTC, then to EDT
-        start_utc = datetime.fromtimestamp(entry['start_time'], tz=timezone.utc)
-        end_utc = datetime.fromtimestamp(entry['end_time'], tz=timezone.utc)
+        # start_utc = datetime.fromtimestamp(entry['start_time'], tz=timezone.utc)
+        # end_utc = datetime.fromtimestamp(entry['end_time'], tz=timezone.utc)
+        start_utc = datetime.fromtimestamp(entry['start_unix_time'], tz=timezone.utc)
+        end_utc = datetime.fromtimestamp(entry['end_unix_time'], tz=timezone.utc)
         
         start_edt = start_utc.astimezone(edt_tz)
         end_edt = end_utc.astimezone(edt_tz)
@@ -58,7 +65,7 @@ def generate_gantt_chart(json_path, output_image_path):
         duration = mdates.date2num(end_naive) - start_num
 
         # Ensure very short actions (like a quick fall) are visible (minimum 10 seconds)
-        duration = max(duration, 10.0 / 86400.0) 
+        duration = max(duration, 30.0 / 86400.0) 
         
         processed_data.append({
             'start': start_naive
@@ -92,17 +99,20 @@ def generate_gantt_chart(json_path, output_image_path):
     ax.set_xlabel(f"Time (Date: {base_date} EDT)", fontsize=14, labelpad=15)
 
     # Final visual touches
-    ax.set_title("24-Hour Patient Activity Timeline", fontsize=16, pad=20)
+    ax.set_title("Activity Timeline - 310 18 GT - 12C", fontsize=16, pad=20)
     ax.grid(True, axis='x', linestyle='--', alpha=0.6)
     plt.tight_layout()
     
     plt.savefig(output_image_path, dpi=150, bbox_inches='tight')
     print(f"Chart saved successfully to: {output_image_path}")
-    plt.show()
+    # plt.show()
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Generate Gantt chart from processed JSON.")
+    parser.add_argument('--input-json', type=str, required=True, help="Path to the input JSON file")
+    parser.add_argument('--output-image', type=str, required=True, help="Path to save the output chart image")
+    return parser.parse_args()
 
 if __name__ == "__main__":
-    # Point this to our new continuous timeline JSON!
-    input_file = "pipeline/csv_input/pose_2026-04-18_310_p_r_f.json"
-    output_image = "pipeline/csv_input/310_18_gantt.png"
-    
-    generate_gantt_chart(input_file, output_image)
+    args = parse_args()
+    generate_gantt_chart(args.input_json, args.output_image)
