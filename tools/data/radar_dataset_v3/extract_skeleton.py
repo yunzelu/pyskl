@@ -12,7 +12,7 @@ def extract_subject_id(folder_name):
         return parts[1]
     return "unknown"
 
-def process_clips(csv_file, data_dir, model_path, tracker_config, device, output_file):
+def process_clips(csv_file, data_dir, model_path, tracker_config, device, output_file, min_len):
     print(f"Loading YOLO model from {model_path} on device: {device}...")
     model = YOLO(model_path)
     
@@ -28,7 +28,7 @@ def process_clips(csv_file, data_dir, model_path, tracker_config, device, output
     
     total_frames_processed = 0
     total_frames_dropped = 0
-    total_clips_dropped = 0 # NEW: Counter for whole clips dropped
+    total_clips_dropped = 0 
 
     print(f"Starting extraction for {len(clips)} clips...")
     
@@ -102,12 +102,12 @@ def process_clips(csv_file, data_dir, model_path, tracker_config, device, output
                 
         cap.release()
         
-        # Calculate actual saved length
+        # Calculate actual saved length after dropping empty frames
         actual_length = len(clip_data["frames"])
         
-        # NEW LOGIC: Check if the clip is now too short
-        if actual_length < 90:
-            print(f"Dropped Clip: {folder} ({start_frame}-{end_frame}). Only {actual_length} valid frames remained after YOLO.")
+        # Check if the clip is now too short based on your argument
+        if actual_length < min_len:
+            print(f"Dropped Clip: {folder} ({start_frame}-{end_frame}). Only {actual_length} valid frames remained (needs {min_len}).")
             total_clips_dropped += 1
             continue # Skip saving this clip and move to the next one
             
@@ -126,7 +126,7 @@ def process_clips(csv_file, data_dir, model_path, tracker_config, device, output
         
     print(f"\n--- DATASET STATISTICS ---")
     print(f"Total Initial Clips: {len(clips)}")
-    print(f"Clips Dropped (<90 frames): {total_clips_dropped}")
+    print(f"Clips Dropped (<{min_len} frames): {total_clips_dropped}")
     print(f"Total Valid Clips Saved: {len(all_skeleton_data)}")
     print(f"Total Video Frames Read: {total_frames_processed}")
     print(f"Empty Frames Dropped: {total_frames_dropped} ({(total_frames_dropped/total_frames_processed)*100:.2f}%)")
@@ -139,10 +139,14 @@ def main():
     parser.add_argument('-m', '--model', type=str, default='yolov8x-pose.pt', help="Path to YOLO pose model weights.")
     parser.add_argument('-t', '--tracker', type=str, default='bytetrack.yaml', help="Tracker config.")
     parser.add_argument('--device', type=str, default='0', help="Device: '0' for GPU, 'cpu' for CPU.")
+    
+    # NEW ARGUMENT: Minimum length to keep a clip
+    parser.add_argument('--min_len', type=int, default=90, help="Minimum valid frames required to keep a clip.")
+    
     parser.add_argument('-o', '--output', type=str, default='dataset_skeletons.json', help="Output JSON filename.")
     
     args = parser.parse_args()
-    process_clips(args.csv, args.dir, args.model, args.tracker, args.device, args.output)
+    process_clips(args.csv, args.dir, args.model, args.tracker, args.device, args.output, args.min_len)
 
 if __name__ == "__main__":
     main()
