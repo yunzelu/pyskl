@@ -561,3 +561,54 @@ class DropScoreChannel:
             # ':2' on the last dimension drops the 3rd channel (the score).
             results['keypoint'] = results['keypoint'][..., :2]
         return results
+
+@PIPELINES.register_module()
+class RobustMasking:
+    def __init__(self, threshold=0.5, mask_prob=0.3):
+        self.threshold = threshold
+        self.mask_prob = mask_prob
+        
+        # Define the blocks that get cut off by cameras in real life
+        self.blocks = {
+            'head': [0, 1, 2, 3, 4],
+            'left_arm': [5, 7, 9],
+            'right_arm': [6, 8, 10],
+            'left_leg': [11, 13, 15],
+            'right_leg': [12, 14, 16],
+            'bottom_half': [11, 12, 13, 14, 15, 16] # Simulates a bed blocking the view
+        }
+
+    def __call__(self, results):
+        kp = results['keypoint'] # Expected shape: [M, T, V, C]
+
+        # 1. Safely extract the score channel using the ellipsis (...)
+        # This handles the array perfectly regardless of how many empty dimensions exist
+        if kp.shape[-1] >= 3:
+            score = kp[..., 2] 
+        elif 'keypoint_score' in results:
+            score = results['keypoint_score']
+        else:
+            score = np.ones(kp.shape[:-1])
+
+        # 2. Score-Based Zero Out (Clean the garbage data)
+        low_conf_mask = score < self.threshold 
+        
+        # Expand the mask from 3D [M, T, V] to 4D [M, T, V, 1]
+        expanded_mask = np.expand_dims(low_conf_mask, axis=-1)
+        
+        # np.where is bulletproof. It reads: "Where the expanded mask is True, put 0.0. Otherwise, keep the original kp value."
+        kp = np.where(expanded_mask, 0.0, kp)
+
+        # 3. Part-Based Dropout (Fix the Domain Shift)
+        if self.mask_prob > 0 and np.random.rand() < self.mask_prob:
+            
+            block_names = list(self.blocks.keys())
+            chosen_block = np.random.choice(block_names)
+            joints_to_mask = self.blocks[chosen_block]
+            
+            for v in joints_to_mask:
+                # Use ellipsis again to guarantee we hit the 'Joints' dimension correctly
+                kp[..., v, :] = 0.0
+
+        results['keypoint'] = kp
+        return results
