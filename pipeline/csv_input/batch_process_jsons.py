@@ -19,7 +19,9 @@ def process_all_jsons(base_dir):
         # Skip files that already have "_f" at the end to prevent double-processing
         if json_path.endswith('_f.json'):
             continue
-            
+        if json_path.startswith('gt_'):
+            continue
+
         # Get the path components
         path_obj = Path(json_path)
         folder = path_obj.parent

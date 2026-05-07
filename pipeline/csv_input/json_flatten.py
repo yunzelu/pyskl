@@ -1,5 +1,6 @@
 import json
 import argparse
+from datetime import datetime, timedelta, timezone
 
 def flatten_to_continuous_timeline(input_json, output_json):
     print(f"Loading inference data from: {input_json}")
@@ -23,12 +24,38 @@ def flatten_to_continuous_timeline(input_json, output_json):
             
     windows = valid_windows # Replace with the clean list
 
+    if not windows:
+        print("No valid windows remained after filtering.")
+        return
+
     # 1. Collect all unique time boundaries
     time_boundaries = set()
     for w in windows:
         time_boundaries.add(w['start_unix_time'])
         time_boundaries.add(w['end_unix_time'])
     
+    # --- NEW: Inject 24-Hour Midnight Boundaries (TRT Timezone) ---
+    edt_tz = timezone(timedelta(hours=-4))
+    
+    # Find the earliest event to determine what the "active day" is
+    first_time_unix = min(w['start_unix_time'] for w in windows)
+    
+    # Convert Unix to TRT Datetime
+    first_time_dt = datetime.fromtimestamp(first_time_unix, tz=timezone.utc).astimezone(edt_tz)
+    
+    # Calculate exactly 00:00:00 of that day, and 00:00:00 of the next day
+    midnight_start_dt = first_time_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    midnight_end_dt = midnight_start_dt + timedelta(days=1)
+    
+    # Convert back to Unix timestamps
+    midnight_start_unix = midnight_start_dt.timestamp()
+    midnight_end_unix = midnight_end_dt.timestamp()
+    
+    # Add these strict boundaries to the set
+    time_boundaries.add(midnight_start_unix)
+    time_boundaries.add(midnight_end_unix)
+    # --------------------------------------------------------------
+
     # Sort the boundaries to create a continuous timeline
     sorted_times = sorted(list(time_boundaries))
     
@@ -45,7 +72,7 @@ def flatten_to_continuous_timeline(input_json, output_json):
 
         # Apply your logic rules
         if len(active_windows) == 0:
-            final_label = "No detection"
+            final_label = "No-Detection" # Automatically applied to the midnight padding
             
         else:
             # Check how many unique people are in this exact segment

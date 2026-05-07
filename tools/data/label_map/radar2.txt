@@ -1,5 +1,5 @@
 Falling
-Lying
+Lay-Stationary
 Sit-Stationary
 Transition-LayBed-to-Sit
 Transition-LayFloor-to-Stand

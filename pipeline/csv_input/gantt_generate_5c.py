@@ -28,12 +28,12 @@ def generate_gantt_chart(json_path, output_image_path):
         "Transition-Sit-to-LayBed":     {"level": 3,  "color": "#5dade2"}, # Light Blue
         "Falling":                      {"level": 2,  "color": "#e74c3c"}, # Red (CRITICAL)
         "Multiperson":                  {"level": 1,  "color": "#9b59b6"}, # Purple
-        "No-Detection":                 {"level": 0,  "color": "#bdc3c7"}, # Grey
-        # "Out-of-Room":                  {"level": 0,  "color": "#bdc3c7"}, # Grey
+        "No detection":                 {"level": 0,  "color": "#bdc3c7"}, # Grey
+        "Out-of-Room":                  {"level": 0,  "color": "#bdc3c7"}, # Grey
         # "Lying":                        {"level": 10, "color": "#2980b9"}, # Dark Blue
-        "Lay-Stationary":                 {"level": 10, "color": "#2980b9"}, # Dark Blue
-        # "LayBed-Stationary":            {"level": 10, "color": "#2980b9"},
-        # "LayFloor-Stationary":          {"level": 11, "color": "#2980b9"},
+        # "Lay-Stationary":                 {"level": 10, "color": "#2980b9"}, # Dark Blue
+        "LayBed-Stationary":            {"level": 10, "color": "#2980b9"},
+        "LayFloor-Stationary":          {"level": 11, "color": "#2980b9"},
     }
 
     # Define EDT timezone (UTC-4)
@@ -44,17 +44,17 @@ def generate_gantt_chart(json_path, output_image_path):
 
     # 2. Process each block in the flattened timeline
     for entry in data:
-        label = entry.get('label')
-        # label = entry.get('action')
+        # label = entry.get('label')
+        label = entry.get('action')
         
         if label not in config:
             continue
             
         # Convert Unix timestamps to UTC, then to EDT
-        start_utc = datetime.fromtimestamp(entry['start_time'], tz=timezone.utc)
-        end_utc = datetime.fromtimestamp(entry['end_time'], tz=timezone.utc)
-        # start_utc = datetime.fromtimestamp(entry['start_unix_time'], tz=timezone.utc)
-        # end_utc = datetime.fromtimestamp(entry['end_unix_time'], tz=timezone.utc)
+        # start_utc = datetime.fromtimestamp(entry['start_time'], tz=timezone.utc)
+        # end_utc = datetime.fromtimestamp(entry['end_time'], tz=timezone.utc)
+        start_utc = datetime.fromtimestamp(entry['start_unix_time'], tz=timezone.utc)
+        end_utc = datetime.fromtimestamp(entry['end_unix_time'], tz=timezone.utc)
         
         start_edt = start_utc.astimezone(edt_tz)
         end_edt = end_utc.astimezone(edt_tz)

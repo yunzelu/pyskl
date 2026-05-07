@@ -115,7 +115,7 @@ def evaluate_invisiguard(gt_json, pred_json):
     valid_mask = (gt_timeline != "Out-of-Room") & \
                  (gt_timeline != "Multiperson") & \
                  (pred_timeline != "Multiperson") & \
-                 (pred_timeline != "No detection") & \
+                 (pred_timeline != "No-Detection") & \
                  (pred_timeline != "Background")
                  
     # Filter timelines using the mask
@@ -145,12 +145,12 @@ def evaluate_invisiguard(gt_json, pred_json):
     print(f"Frame-wise Micro Acc:    {model_micro_acc:.4f}")
     
     # =========================================================
-    # SYSTEM-LEVEL EVALUATION (No skipping, Map No Detection)
+    # SYSTEM-LEVEL EVALUATION (No skipping, Map No-Detection)
     # =========================================================
     pred_sys_timeline = pred_timeline.copy()
     
-    # Rule 3: Map "No detection" and empty space to "Out-of-Room"
-    pred_sys_timeline[pred_sys_timeline == "No detection"] = "Out-of-Room"
+    # Rule 3: Map "No-Detection" and empty space to "Out-of-Room"
+    pred_sys_timeline[pred_sys_timeline == "No-Detection"] = "Out-of-Room"
     pred_sys_timeline[pred_sys_timeline == "Background"] = "Out-of-Room" 
     
     gt_segments_sys = timeline_to_segments(gt_timeline)
@@ -179,7 +179,7 @@ def evaluate_invisiguard(gt_json, pred_json):
 # ---------------------------------------------------------
 if __name__ == "__main__":
     GT_FILE_PATH = "/mnt/d/lu/project/auto_labeling_pipeline/data/Willowbend/310/gt_pose_2026-04-18_310.json"
-    PRED_FILE_PATH = "/mnt/d/lu/project/auto_labeling_pipeline/data/Willowbend/310/pose_2026-04-18_310_p_r3_f.json"
+    PRED_FILE_PATH = "/mnt/d/lu/project/auto_labeling_pipeline/data/Willowbend/310/pose_2026-04-18_310_p_r2_f.json"
     
     try:
         print(f"Loading Ground Truth from: {GT_FILE_PATH}")
