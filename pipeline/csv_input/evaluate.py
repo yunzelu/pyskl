@@ -25,7 +25,9 @@ def json_to_timeline(data_list, start_time, end_time, fps=10):
         
         # Apply Rule 1: Combine Lying classes
         if label in ["LayBed-Stationary", "LayFloor-Stationary"]:
-            label = "Lying"
+            # label = "Lying"
+            label = "Lay-Stationary"
+
             
         timeline[idx_start:idx_end] = label
         
@@ -176,8 +178,8 @@ def evaluate_invisiguard(gt_json, pred_json):
 # 4. File Loading and Execution
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    GT_FILE_PATH = "pipeline/csv_input/gt_310_18.json"
-    PRED_FILE_PATH = "pipeline/csv_input/pose_2026-04-18_310_p_r_f.json"
+    GT_FILE_PATH = "/mnt/d/lu/project/auto_labeling_pipeline/data/Willowbend/310/gt_pose_2026-04-18_310.json"
+    PRED_FILE_PATH = "/mnt/d/lu/project/auto_labeling_pipeline/data/Willowbend/310/pose_2026-04-18_310_p_r3_f.json"
     
     try:
         print(f"Loading Ground Truth from: {GT_FILE_PATH}")

@@ -10,6 +10,19 @@ def flatten_to_continuous_timeline(input_json, output_json):
         print("No data found in JSON.")
         return
 
+    # --- SAFETY FILTER ---
+    # 100 frames @ 30fps = 3.33 seconds. Allow up to 10 seconds.
+    # Drops any weird windows that span a massive time gap.
+    MAX_VALID_DURATION = 10.0 
+    
+    valid_windows = []
+    for w in windows:
+        duration = w['end_unix_time'] - w['start_unix_time']
+        if duration <= MAX_VALID_DURATION:
+            valid_windows.append(w)
+            
+    windows = valid_windows # Replace with the clean list
+
     # 1. Collect all unique time boundaries
     time_boundaries = set()
     for w in windows:
@@ -54,6 +67,10 @@ def flatten_to_continuous_timeline(input_json, output_json):
             "label": final_label
         })
 
+    if not raw_segments:
+        print("No valid segments generated.")
+        return
+
     # 3. Merge consecutive segments that have the exact same label
     merged_timeline = []
     current_segment = raw_segments[0]
@@ -77,8 +94,8 @@ def flatten_to_continuous_timeline(input_json, output_json):
     print("\n" + "="*50)
     print("TIMELINE FLATTENING COMPLETE")
     print("="*50)
-    print(f"Original overlapping windows: {len(windows)}")
-    print(f"Final continuous blocks:      {len(merged_timeline)}")
+    print(f"Original windows (after filter): {len(windows)}")
+    print(f"Final continuous blocks:         {len(merged_timeline)}")
     print(f"Saved to: {output_json}")
     print("="*50)
 
