@@ -178,8 +178,8 @@ def evaluate_invisiguard(gt_json, pred_json):
 # 4. File Loading and Execution
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    GT_FILE_PATH = "/mnt/d/lu/project/auto_labeling_pipeline/data/Willowbend/310/gt_pose_2026-04-18_310.json"
-    PRED_FILE_PATH = "/mnt/d/lu/project/auto_labeling_pipeline/data/Willowbend/310/pose_2026-04-18_310_p_r2_f.json"
+    GT_FILE_PATH = "/mnt/d/lu/project/auto_labeling_pipeline/data/Willowbend/310/gt_pose_2026-04-18_310_5c.json"
+    PRED_FILE_PATH = "/mnt/d/lu/project/auto_labeling_pipeline/data/Willowbend/310/pose_2026-04-18_310_p_r3.1_f_5c.json"
     
     try:
         print(f"Loading Ground Truth from: {GT_FILE_PATH}")

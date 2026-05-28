@@ -10,7 +10,8 @@ def process_all_jsons(base_dir):
     print(f"Searching for JSON files in: {base_dir}")
     
     # Use glob to find all .json files in the base directory and all subfolders (recursive)
-    search_pattern = os.path.join(base_dir, "**", "*.json")
+    search_pattern = os.path.join(base_dir, "310/", "*_r3.1.json")
+    print(search_pattern)
     all_json_files = glob.glob(search_pattern, recursive=True)
     
     processed_count = 0
@@ -18,6 +19,12 @@ def process_all_jsons(base_dir):
     for json_path in all_json_files:
         # Skip files that already have "_f" at the end to prevent double-processing
         if json_path.endswith('_f.json'):
+            continue
+        if json_path.endswith('_r2.json'):
+            continue
+        if json_path.endswith('310_p_r3.json'):
+            continue
+        if json_path.endswith('-28_p_r3.json') or json_path.endswith('-29_p_r3.json'):
             continue
         if json_path.startswith('gt_'):
             continue
@@ -47,6 +54,6 @@ def process_all_jsons(base_dir):
 
 if __name__ == "__main__":
     # Define the base directory containing your room subfolders
-    BASE_DIR = "/mnt/d/lu/project/auto_labeling_pipeline/data/Willowbend/"
+    BASE_DIR = r"/mnt/d/lu/project/auto_labeling_pipeline/data/Willowbend/"
     
     process_all_jsons(BASE_DIR)

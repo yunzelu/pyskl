@@ -19,21 +19,12 @@ def generate_gantt_chart(json_path, output_image_path):
 
     # 1. Update the configuration to match our new HAR taxonomy
     config = {
-        "Walking":                      {"level": 9,  "color": "#2ecc71"}, # Green
-        "Transition-LayFloor-to-Stand": {"level": 8,  "color": "#e67e22"}, # Orange
-        "Transition-Sit-to-Stand":      {"level": 7,  "color": "#f39c12"}, # Light Orange
-        "Transition-Stand-to-Sit":      {"level": 6,  "color": "#f1c40f"}, # Yellow
-        "Transition-LayBed-to-Sit":     {"level": 5,  "color": "#f3ce70"}, # Light Yellow
-        "Sit-Stationary":               {"level": 4,  "color": "#1abc9c"}, # Teal
-        "Transition-Sit-to-LayBed":     {"level": 3,  "color": "#5dade2"}, # Light Blue
-        "Falling":                      {"level": 2,  "color": "#e74c3c"}, # Red (CRITICAL)
+        "Lying":                        {"level": 5,  "color": "#2980b9"}, # Dark Blue
+        "Standing / Walking":           {"level": 4,  "color": "#2ecc71"}, # Green
+        "Sitting":                      {"level": 3,  "color": "#f1c40f"}, # Teal
+        "Fall":                         {"level": 2,  "color": "#e74c3c"}, # Red (CRITICAL)
         "Multiperson":                  {"level": 1,  "color": "#9b59b6"}, # Purple
-        "No detection":                 {"level": 0,  "color": "#bdc3c7"}, # Grey
-        "Out-of-Room":                  {"level": 0,  "color": "#bdc3c7"}, # Grey
-        # "Lying":                        {"level": 10, "color": "#2980b9"}, # Dark Blue
-        # "Lay-Stationary":                 {"level": 10, "color": "#2980b9"}, # Dark Blue
-        "LayBed-Stationary":            {"level": 10, "color": "#2980b9"},
-        "LayFloor-Stationary":          {"level": 11, "color": "#2980b9"},
+        "No-Detection":                 {"level": 0,  "color": "#bdc3c7"}, # Grey
     }
 
     # Define EDT timezone (UTC-4)
@@ -44,17 +35,17 @@ def generate_gantt_chart(json_path, output_image_path):
 
     # 2. Process each block in the flattened timeline
     for entry in data:
-        # label = entry.get('label')
-        label = entry.get('action')
+        label = entry.get('label')
+        # label = entry.get('action')
         
         if label not in config:
             continue
             
         # Convert Unix timestamps to UTC, then to EDT
-        # start_utc = datetime.fromtimestamp(entry['start_time'], tz=timezone.utc)
-        # end_utc = datetime.fromtimestamp(entry['end_time'], tz=timezone.utc)
-        start_utc = datetime.fromtimestamp(entry['start_unix_time'], tz=timezone.utc)
-        end_utc = datetime.fromtimestamp(entry['end_unix_time'], tz=timezone.utc)
+        start_utc = datetime.fromtimestamp(entry['start_time'], tz=timezone.utc)
+        end_utc = datetime.fromtimestamp(entry['end_time'], tz=timezone.utc)
+        # start_utc = datetime.fromtimestamp(entry['start_unix_time'], tz=timezone.utc)
+        # end_utc = datetime.fromtimestamp(entry['end_unix_time'], tz=timezone.utc)
         
         start_edt = start_utc.astimezone(edt_tz)
         end_edt = end_utc.astimezone(edt_tz)
@@ -112,8 +103,10 @@ def generate_gantt_chart(json_path, output_image_path):
     base_date = midnight_start.strftime('%Y-%m-%d')
     ax.set_xlabel(f"Time (Date: {base_date} EDT)", fontsize=14, labelpad=15)
 
+    filename = json_path.split('/')[-1]
+    date = filename.split('_')[1]
     # Final visual touches
-    ax.set_title("Activity Timeline - 310 18 - v3 - 11C", fontsize=16, pad=20)
+    ax.set_title("Activity Timeline 310 "+date, fontsize=16, pad=20)
     ax.grid(True, axis='x', linestyle='--', alpha=0.6)
     plt.tight_layout()
     
