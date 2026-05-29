@@ -553,13 +553,22 @@ class DecompressPose:
 
 @PIPELINES.register_module()
 class DropScoreChannel:
-    """Custom pipeline to keep only x and y channels."""
+    """Keep only x and y channels and remove keypoint_score.
+
+    This transform is useful when we want the final model input to use
+    only coordinate channels: x and y.
+    """
+
     def __call__(self, results):
         if 'keypoint' in results:
-            # The tensor shape here is [M, T, V, C]
-            # Using '...' tells Python to keep M, T, and V exactly the same.
-            # ':2' on the last dimension drops the 3rd channel (the score).
             results['keypoint'] = results['keypoint'][..., :2]
+
+        # Important:
+        # FormatGCNInput will re-concatenate keypoint_score if this key exists.
+        # So we must remove it.
+        if 'keypoint_score' in results:
+            results.pop('keypoint_score')
+
         return results
 
 @PIPELINES.register_module()
