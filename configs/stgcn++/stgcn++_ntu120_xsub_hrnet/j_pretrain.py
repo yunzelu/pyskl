@@ -1,9 +1,11 @@
 model = dict(
     type='RecognizerGCN',
     backbone=dict(
-		type='CTRGCN',
+        type='STGCN',
+        gcn_adaptive='init',
+        gcn_with_res=True,
+        tcn_type='mstcn',
         in_channels=2,
-        num_person=1,
         graph_cfg=dict(layout='coco', mode='spatial')),
     cls_head=dict(type='GCNHead', num_classes=120, in_channels=256))
 
@@ -14,7 +16,6 @@ train_pipeline = [
     dict(type='GenSkeFeat', dataset='coco', feats=['j']),
     dict(type='UniformSample', clip_len=100),
     dict(type='PoseDecode'),
-    dict(type='DropScoreChannel'),
     dict(type='FormatGCNInput', num_person=1),
     dict(type='Collect', keys=['keypoint', 'label'], meta_keys=[]),
     dict(type='ToTensor', keys=['keypoint'])
@@ -24,7 +25,6 @@ val_pipeline = [
     dict(type='GenSkeFeat', dataset='coco', feats=['j']),
     dict(type='UniformSample', clip_len=100, num_clips=1),
     dict(type='PoseDecode'),
-    dict(type='DropScoreChannel'),
     dict(type='FormatGCNInput', num_person=1),
     dict(type='Collect', keys=['keypoint', 'label'], meta_keys=[]),
     dict(type='ToTensor', keys=['keypoint'])
@@ -34,7 +34,6 @@ test_pipeline = [
     dict(type='GenSkeFeat', dataset='coco', feats=['j']),
     dict(type='UniformSample', clip_len=100, num_clips=10),
     dict(type='PoseDecode'),
-    dict(type='DropScoreChannel'),
     dict(type='FormatGCNInput', num_person=1),
     dict(type='Collect', keys=['keypoint', 'label'], meta_keys=[]),
     dict(type='ToTensor', keys=['keypoint'])
@@ -62,4 +61,4 @@ log_config = dict(interval=100, hooks=[dict(type='TextLoggerHook')])
 
 # runtime settings
 log_level = 'INFO'
-work_dir = './work_dirs/ctrgcn/ctrgcn_pyskl_ntu120_xsub_hrnet/j_pretrain'
+work_dir = './work_dirs/stgcn++/stgcn++_ntu120_xsub_hrnet/j_pretrain'
