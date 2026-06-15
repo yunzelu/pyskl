@@ -192,26 +192,30 @@ def clip_segments_to_video(
     frame_count: int,
 ) -> list[dict[str, Any]]:
     clipped = []
+    has_known_frame_count = frame_count > 0
 
     for seg in segments:
         start = int(seg["start_frame"])
         end = seg["end_frame"]
 
-        if end is None:
+        if end is None and has_known_frame_count:
             end = frame_count - 1
 
-        end = min(int(end), frame_count - 1)
+        if end is not None:
+            end = int(end)
+            if has_known_frame_count:
+                end = min(end, frame_count - 1)
 
         if start < 0:
             start = 0
 
-        if start > end:
+        if end is not None and start > end:
             continue
 
         new_seg = dict(seg)
         new_seg["start_frame"] = start
         new_seg["end_frame"] = end
-        new_seg["length_frames"] = end - start + 1
+        new_seg["length_frames"] = None if end is None else end - start + 1
         clipped.append(new_seg)
 
     return clipped
@@ -240,13 +244,45 @@ def build_frame_label_arrays(
     return labels, groups, segment_ids
 
 
+def find_segment_id_for_frame(
+    frame_idx: int,
+    segments: list[dict[str, Any]],
+    cursor: int,
+) -> tuple[int | None, int]:
+    """
+    Find the annotation segment for monotonically increasing frame indices.
+    Used when OpenCV cannot report a valid frame count, so we cannot build
+    dense frame-label arrays up front.
+    """
+    if not segments:
+        return None, cursor
+
+    while cursor + 1 < len(segments):
+        next_start = int(segments[cursor + 1]["start_frame"])
+        if frame_idx < next_start:
+            break
+        cursor += 1
+
+    seg = segments[cursor]
+    start = int(seg["start_frame"])
+    end = seg["end_frame"]
+
+    if frame_idx < start:
+        return None, cursor
+
+    if end is not None and frame_idx > int(end):
+        return None, cursor
+
+    return cursor, cursor
+
+
 def discover_sessions(root: Path) -> list[dict[str, Any]]:
     """
     Find folders containing both output_video.avi and frame_labels.csv.
     """
     sessions = []
 
-    for folder in sorted(root.rglob("*")):
+    for folder in [root, *sorted(root.rglob("*"))]:
         if not folder.is_dir():
             continue
 
@@ -275,6 +311,9 @@ def make_output_path(
     imgsz: list[int],
 ) -> Path:
     rel = session_folder.relative_to(dataset_root)
+    if str(rel) == ".":
+        rel = Path(session_folder.name)
+
     model_name = Path(model_path).stem
 
     if len(imgsz) == 1:
@@ -412,13 +451,24 @@ def process_one_session(
     reported_fps = float(cap.get(cv2.CAP_PROP_FPS))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    frame_count_known = frame_count > 0
+
+    if not frame_count_known:
+        print(
+            f"[WARN] {session['session_name']}: cv2 reported frame_count={frame_count}. "
+            "Keeping annotation segments unclipped and assigning labels by frame_idx."
+        )
 
     raw_segments = read_frame_labels(label_path)
     segments = clip_segments_to_video(raw_segments, frame_count)
-    frame_labels, frame_groups, frame_segment_ids = build_frame_label_arrays(
-        segments=segments,
-        frame_count=frame_count,
-    )
+
+    if frame_count_known:
+        frame_labels, frame_groups, frame_segment_ids = build_frame_label_arrays(
+            segments=segments,
+            frame_count=frame_count,
+        )
+    else:
+        frame_labels, frame_groups, frame_segment_ids = [], [], []
 
     label_set = sorted({seg["label"] for seg in segments})
     label_group_set = sorted({seg["label_group"] for seg in segments})
@@ -441,6 +491,7 @@ def process_one_session(
             "width": width,
             "height": height,
             "frame_count_from_cv2": frame_count,
+            "frame_count_known_from_cv2": frame_count_known,
         },
         "annotation_info": {
             "annotation_path": str(label_path),
@@ -478,12 +529,13 @@ def process_one_session(
         f.write(json.dumps(metadata, ensure_ascii=False, default=to_builtin) + "\n")
 
         pbar = tqdm(
-            total=frame_count,
+            total=frame_count if frame_count_known else None,
             desc=session["session_name"],
             unit="frame",
         )
 
         frame_idx = 0
+        segment_cursor = 0
         total_wall_time_sec = 0.0
 
         while True:
@@ -529,13 +581,23 @@ def process_one_session(
                 else None
             )
 
-            label = frame_labels[frame_idx] if frame_idx < len(frame_labels) else None
-            label_group = frame_groups[frame_idx] if frame_idx < len(frame_groups) else "unlabeled"
-            segment_id = (
-                frame_segment_ids[frame_idx]
-                if frame_idx < len(frame_segment_ids)
-                else None
-            )
+            if frame_idx < len(frame_labels):
+                label = frame_labels[frame_idx]
+                label_group = frame_groups[frame_idx]
+                segment_id = frame_segment_ids[frame_idx]
+            else:
+                segment_id, segment_cursor = find_segment_id_for_frame(
+                    frame_idx=frame_idx,
+                    segments=segments,
+                    cursor=segment_cursor,
+                )
+
+                if segment_id is not None:
+                    label = segments[segment_id]["label"]
+                    label_group = segments[segment_id]["label_group"]
+                else:
+                    label = None
+                    label_group = "unlabeled"
 
             if segment_id is not None:
                 seg = segments[segment_id]
