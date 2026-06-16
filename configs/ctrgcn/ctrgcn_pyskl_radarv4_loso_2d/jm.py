@@ -3,7 +3,7 @@
 # Stream options: 'j', 'b', 'jm', 'bm'
 # ============================================================
 
-stream = 'j'  # change to 'b', 'jm', or 'bm' for other streams
+stream = 'jm'  # change to 'b', 'jm', or 'bm' for other streams
 
 model = dict(
     type='RecognizerGCN',
@@ -126,7 +126,7 @@ optimizer_config = dict(grad_clip=None)
 # learning policy
 lr_config = dict(policy='CosineAnnealing', min_lr=0, by_epoch=False)
 
-total_epochs = 16
+total_epochs = 20
 
 checkpoint_config = dict(interval=1)
 

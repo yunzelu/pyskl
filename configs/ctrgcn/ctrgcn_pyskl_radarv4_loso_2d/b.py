@@ -3,7 +3,7 @@
 # Stream options: 'j', 'b', 'jm', 'bm'
 # ============================================================
 
-stream = 'j'  # change to 'b', 'jm', or 'bm' for other streams
+stream = 'b'  # change to 'b', 'jm', or 'bm' for other streams
 
 model = dict(
     type='RecognizerGCN',
