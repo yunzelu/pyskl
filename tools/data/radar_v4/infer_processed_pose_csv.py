@@ -7,8 +7,8 @@ the auto_labeling_pipeline project:
 
 Missing artificial frames are represented by one all-zero row. This script
 creates sliding windows over those artificial frames, runs the trained PySKL
-model, and aggregates overlapping window scores back onto every artificial
-frame timestamp.
+model, assigns each window prediction to the center frame, and fills a dense
+frame timeline by nearest center prediction.
 
 Example:
     python tools/data/radar_v4/infer_processed_pose_csv.py ^
@@ -28,9 +28,9 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-DEFAULT_CONFIG = Path("configs/ctrgcn/ctrgcn_pyskl_radarv4_loso_2d/a_j.py")
+DEFAULT_CONFIG = Path("configs/ctrgcn/ctrgcn_pyskl_radarv4_loso_2d/jm.py")
 DEFAULT_CHECKPOINT = Path(
-    "work_dirs/ctrgcn/ctrgcn_pyskl_radarv4_2d/j/epoch_16.pth"
+    r"work_dirs/ctrgcn/ctrgcn_pyskl_radarv4_loso_mia_2d/jm/epoch_14.pth"
 )
 DEFAULT_LABEL_MAP = Path("tools/data/label_map/radarv4.txt")
 NUM_KEYPOINTS = 17
@@ -56,6 +56,25 @@ class Window:
     end: int
     keypoint: np.ndarray
     keypoint_score: np.ndarray
+
+
+@dataclass(frozen=True)
+class WindowPrediction:
+    start: int
+    end: int
+    center: int
+    valid_frames: int
+    scores: np.ndarray
+
+
+@dataclass(frozen=True)
+class TimelineScores:
+    scores: np.ndarray
+    contributing_windows: np.ndarray
+    assigned_centers: np.ndarray
+    assigned_window_starts: np.ndarray
+    assigned_window_ends: np.ndarray
+    center_distances: np.ndarray
 
 
 def safe_float(value: object, default: float = 0.0) -> float:
@@ -409,6 +428,10 @@ def make_window(grid: FrameGrid, start: int, window_size: int) -> Window:
     return Window(start=start, end=end, keypoint=keypoint, keypoint_score=keypoint_score)
 
 
+def window_center(start: int, end: int) -> int:
+    return start + (end - start) // 2
+
+
 def make_fake_anno(window: Window, img_shape: tuple[int, int]) -> dict:
     return {
         "frame_dir": f"processed_pose_{window.start:09d}_{window.end - 1:09d}",
@@ -455,7 +478,7 @@ def run_batch(
     return np.asarray(scores, dtype=np.float32)
 
 
-def infer_scores(
+def infer_window_predictions(
     grid: FrameGrid,
     config_path: Path,
     checkpoint_path: Path,
@@ -469,7 +492,7 @@ def infer_scores(
     min_valid_frames: int | None,
     include_tail: bool,
     quiet: bool,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[list[WindowPrediction], np.ndarray, int]:
     import mmcv
     import numpy as np
 
@@ -483,17 +506,16 @@ def infer_scores(
     pipeline = Compose(config.data.test.pipeline)
 
     total_frames = grid.total_frames
-    num_classes = len(labels)
-    score_sums = np.zeros((total_frames, num_classes), dtype=np.float32)
-    contributing_windows = np.zeros(total_frames, dtype=np.int32)
     covering_windows = np.zeros(total_frames, dtype=np.int32)
+    window_predictions: list[WindowPrediction] = []
 
     batch: list[Window] = []
+    batch_valid_frames: list[int] = []
     starts = window_starts(total_frames, window_size, stride, include_tail=include_tail)
     valid_window_total = 0
 
     def flush_batch() -> None:
-        nonlocal batch
+        nonlocal batch, batch_valid_frames
         if not batch:
             return
 
@@ -503,10 +525,18 @@ def infer_scores(
             windows=batch,
             img_shape=img_shape,
         )
-        for window, score in zip(batch, scores):
-            score_sums[window.start:window.end] += score
-            contributing_windows[window.start:window.end] += 1
+        for window, valid_frames, score in zip(batch, batch_valid_frames, scores):
+            window_predictions.append(
+                WindowPrediction(
+                    start=window.start,
+                    end=window.end,
+                    center=window_center(window.start, window.end),
+                    valid_frames=valid_frames,
+                    scores=score,
+                )
+            )
         batch = []
+        batch_valid_frames = []
 
     for index, start in enumerate(starts, start=1):
         window = make_window(grid=grid, start=start, window_size=window_size)
@@ -522,6 +552,7 @@ def infer_scores(
 
         if valid_frames >= required:
             batch.append(window)
+            batch_valid_frames.append(valid_frames)
             valid_window_total += 1
 
         if len(batch) >= batch_size:
@@ -537,15 +568,127 @@ def infer_scores(
     if not quiet:
         print(f"[INFO] Inferred {valid_window_total}/{len(starts)} windows")
 
-    return score_sums, contributing_windows, covering_windows
+    return window_predictions, covering_windows, len(starts)
+
+
+def build_center_timeline_scores(
+    total_frames: int,
+    num_classes: int,
+    window_predictions: list[WindowPrediction],
+) -> TimelineScores:
+    import numpy as np
+
+    scores = np.zeros((total_frames, num_classes), dtype=np.float32)
+    contributing_windows = np.zeros(total_frames, dtype=np.int32)
+    assigned_centers = np.full(total_frames, -1, dtype=np.int32)
+    assigned_window_starts = np.full(total_frames, -1, dtype=np.int32)
+    assigned_window_ends = np.full(total_frames, -1, dtype=np.int32)
+    center_distances = np.full(total_frames, -1, dtype=np.int32)
+
+    if total_frames == 0 or not window_predictions:
+        return TimelineScores(
+            scores=scores,
+            contributing_windows=contributing_windows,
+            assigned_centers=assigned_centers,
+            assigned_window_starts=assigned_window_starts,
+            assigned_window_ends=assigned_window_ends,
+            center_distances=center_distances,
+        )
+
+    predictions = sorted(window_predictions, key=lambda item: (item.center, item.start))
+    centers = np.asarray([item.center for item in predictions], dtype=np.int32)
+
+    for frame_index in range(total_frames):
+        right = int(np.searchsorted(centers, frame_index, side="left"))
+        left = right - 1
+
+        if left < 0:
+            chosen = right
+        elif right >= len(predictions):
+            chosen = left
+        else:
+            left_distance = frame_index - int(centers[left])
+            right_distance = int(centers[right]) - frame_index
+            # Tie goes to the later center, matching intervals like 35-44
+            # for centers 30 and 40.
+            chosen = left if left_distance < right_distance else right
+
+        prediction = predictions[chosen]
+        scores[frame_index] = prediction.scores
+        contributing_windows[frame_index] = 1
+        assigned_centers[frame_index] = prediction.center
+        assigned_window_starts[frame_index] = prediction.start
+        assigned_window_ends[frame_index] = prediction.end - 1
+        center_distances[frame_index] = abs(frame_index - prediction.center)
+
+    return TimelineScores(
+        scores=scores,
+        contributing_windows=contributing_windows,
+        assigned_centers=assigned_centers,
+        assigned_window_starts=assigned_window_starts,
+        assigned_window_ends=assigned_window_ends,
+        center_distances=center_distances,
+    )
+
+
+def build_window_average_timeline_scores(
+    total_frames: int,
+    num_classes: int,
+    window_predictions: list[WindowPrediction],
+) -> TimelineScores:
+    import numpy as np
+
+    score_sums = np.zeros((total_frames, num_classes), dtype=np.float32)
+    contributing_windows = np.zeros(total_frames, dtype=np.int32)
+    assigned_centers = np.full(total_frames, -1, dtype=np.int32)
+    assigned_window_starts = np.full(total_frames, -1, dtype=np.int32)
+    assigned_window_ends = np.full(total_frames, -1, dtype=np.int32)
+    center_distances = np.full(total_frames, -1, dtype=np.int32)
+
+    for prediction in window_predictions:
+        score_sums[prediction.start:prediction.end] += prediction.scores
+        contributing_windows[prediction.start:prediction.end] += 1
+
+    valid = contributing_windows > 0
+    scores = score_sums.copy()
+    scores[valid] = scores[valid] / contributing_windows[valid].reshape(-1, 1)
+
+    return TimelineScores(
+        scores=scores,
+        contributing_windows=contributing_windows,
+        assigned_centers=assigned_centers,
+        assigned_window_starts=assigned_window_starts,
+        assigned_window_ends=assigned_window_ends,
+        center_distances=center_distances,
+    )
+
+
+def build_timeline_scores(
+    total_frames: int,
+    num_classes: int,
+    window_predictions: list[WindowPrediction],
+    timeline_mode: str,
+) -> TimelineScores:
+    if timeline_mode == "center":
+        return build_center_timeline_scores(
+            total_frames=total_frames,
+            num_classes=num_classes,
+            window_predictions=window_predictions,
+        )
+    if timeline_mode == "window-average":
+        return build_window_average_timeline_scores(
+            total_frames=total_frames,
+            num_classes=num_classes,
+            window_predictions=window_predictions,
+        )
+    raise ValueError(f"Unsupported timeline mode: {timeline_mode}")
 
 
 def write_predictions(
     output_path: Path,
     grid: FrameGrid,
     labels: list[str],
-    score_sums: np.ndarray,
-    contributing_windows: np.ndarray,
+    timeline: TimelineScores,
     covering_windows: np.ndarray,
     overwrite: bool,
 ) -> None:
@@ -568,6 +711,11 @@ def write_predictions(
         "covering_windows",
         "detection_count",
         "selected_detection",
+        "assigned_center_frame",
+        "assigned_window_start",
+        "assigned_window_end",
+        "center_distance",
+        "is_prediction_center",
         *score_columns,
     ]
 
@@ -576,9 +724,9 @@ def write_predictions(
         writer.writerow(columns)
 
         for frame_index, timestamp in enumerate(grid.timestamps):
-            window_count = int(contributing_windows[frame_index])
+            window_count = int(timeline.contributing_windows[frame_index])
             if window_count > 0:
-                scores = score_sums[frame_index] / window_count
+                scores = timeline.scores[frame_index]
                 prediction_id = int(np.argmax(scores))
                 prediction = labels[prediction_id]
                 confidence = float(scores[prediction_id])
@@ -611,6 +759,14 @@ def write_predictions(
                     int(covering_windows[frame_index]),
                     int(grid.detection_count[frame_index]),
                     int(grid.selected_detection[frame_index]),
+                    int(timeline.assigned_centers[frame_index]),
+                    int(timeline.assigned_window_starts[frame_index]),
+                    int(timeline.assigned_window_ends[frame_index]),
+                    int(timeline.center_distances[frame_index]),
+                    int(
+                        window_count > 0
+                        and int(timeline.assigned_centers[frame_index]) == frame_index
+                    ),
                     *[f"{float(score):.8f}" for score in scores],
                 ]
             )
@@ -650,6 +806,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--window-size", type=int, default=60)
     parser.add_argument("--stride", type=int, default=30)
     parser.add_argument("--batch-size", type=int, default=128)
+    parser.add_argument(
+        "--timeline-mode",
+        choices=["center", "window-average"],
+        default="center",
+        help=(
+            "How to convert sliding-window predictions to frame predictions. "
+            "center assigns each window to its center and fills by nearest center. "
+            "window-average averages all windows covering each frame. Default: center."
+        ),
+    )
     parser.add_argument(
         "--device",
         default="auto",
@@ -763,7 +929,7 @@ def main() -> None:
             f"device={device}"
         )
 
-    score_sums, contributing_windows, covering_windows = infer_scores(
+    window_predictions, covering_windows, total_windows = infer_window_predictions(
         grid=grid,
         config_path=args.config,
         checkpoint_path=args.checkpoint,
@@ -778,20 +944,26 @@ def main() -> None:
         include_tail=not args.no_tail_window,
         quiet=args.quiet,
     )
+    timeline = build_timeline_scores(
+        total_frames=grid.total_frames,
+        num_classes=len(labels),
+        window_predictions=window_predictions,
+        timeline_mode=args.timeline_mode,
+    )
 
     write_predictions(
         output_path=output_path,
         grid=grid,
         labels=labels,
-        score_sums=score_sums,
-        contributing_windows=contributing_windows,
+        timeline=timeline,
         covering_windows=covering_windows,
         overwrite=args.overwrite,
     )
 
     if not args.quiet:
-        predicted_frames = int(np.count_nonzero(contributing_windows))
+        predicted_frames = int(np.count_nonzero(timeline.contributing_windows))
         print(f"[DONE] Wrote {grid.total_frames} frame predictions to {output_path}")
+        print(f"[DONE] Valid windows: {len(window_predictions)}/{total_windows}")
         print(f"[DONE] Frames with model predictions: {predicted_frames}")
 
 

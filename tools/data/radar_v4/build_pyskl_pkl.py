@@ -643,11 +643,21 @@ def subjects_from_annotations(annotations: list[dict[str, Any]]) -> list[str]:
 def make_split(
     annotations: list[dict[str, Any]],
     val_subject: str | None,
+    test_subject: str | None = None,
 ) -> dict[str, list[str]]:
-    split = {"train": [], "val": []}
+    if val_subject is not None and test_subject is not None and val_subject == test_subject:
+        raise ValueError("Validation and test subjects must be different.")
+
+    split = {"train": [], "val": [], "test": []}
 
     for item in annotations:
-        target = "val" if val_subject is not None and item["subject"] == val_subject else "train"
+        subject = str(item["subject"])
+        if val_subject is not None and subject == val_subject:
+            target = "val"
+        elif test_subject is not None and subject == test_subject:
+            target = "test"
+        else:
+            target = "train"
         split[target].append(item["frame_dir"])
 
     return split
@@ -678,6 +688,7 @@ def make_summary(
     output_pkl: Path,
     clip_len: int,
     val_subject: str | None,
+    test_subject: str | None,
 ) -> dict[str, Any]:
     by_split = {
         split_name: count_by_class(annotations, ids)
@@ -688,9 +699,11 @@ def make_summary(
         "output_pkl": str(output_pkl),
         "clip_len": clip_len,
         "val_subject": val_subject,
+        "test_subject": test_subject,
         "num_annotations": len(annotations),
         "num_train": len(split["train"]),
         "num_val": len(split["val"]),
+        "num_test": len(split["test"]),
         "label_to_id": LABEL_TO_ID,
         "samples_per_class": count_by_class(annotations),
         "samples_per_subject": count_by_subject(annotations),
@@ -719,6 +732,7 @@ def save_dataset(
     output_pkl: Path,
     clip_len: int,
     val_subject: str | None,
+    test_subject: str | None = None,
 ) -> None:
     output_pkl.parent.mkdir(parents=True, exist_ok=True)
     with output_pkl.open("wb") as f:
@@ -738,6 +752,7 @@ def save_dataset(
         output_pkl=output_pkl,
         clip_len=clip_len,
         val_subject=val_subject,
+        test_subject=test_subject,
     )
     summary_path = output_pkl.with_name(f"{output_pkl.stem}_summary.json")
     with summary_path.open("w", encoding="utf-8") as f:
@@ -745,13 +760,20 @@ def save_dataset(
 
     print(
         f"[DONE] {output_pkl} "
-        f"(annotations={len(annotations)}, train={len(split['train'])}, val={len(split['val'])})"
+        f"(annotations={len(annotations)}, train={len(split['train'])}, "
+        f"val={len(split['val'])}, test={len(split['test'])})"
     )
     print(f"[DONE] Summary: {summary_path}")
 
 
 def loso_output_path(output: Path, subject: str) -> Path:
     return output.with_name(f"{output.stem}_loso_{sanitize_id(subject)}{output.suffix}")
+
+
+def fixed_val_test_output_path(output: Path, val_subject: str, test_subject: str) -> Path:
+    return output.with_name(
+        f"{output.stem}_val_{sanitize_id(val_subject)}_test_{sanitize_id(test_subject)}{output.suffix}"
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -772,7 +794,10 @@ def parse_args() -> argparse.Namespace:
         "--output",
         type=Path,
         default=Path("data/radar_v4/pyskl/radar_v4_yolo26xpose_clip60.pkl"),
-        help="Output pkl path. With --make-all-loso this is used as the base filename.",
+        help=(
+            "Output pkl path. With --make-all-loso or --make-fixed-val-test-folds "
+            "this is used as the base filename."
+        ),
     )
     parser.add_argument(
         "--clip-len",
@@ -786,9 +811,22 @@ def parse_args() -> argparse.Namespace:
         help="Held-out subject id/name for the validation split.",
     )
     parser.add_argument(
+        "--test-subject",
+        default=None,
+        help="Held-out subject id/name for the test split.",
+    )
+    parser.add_argument(
         "--make-all-loso",
         action="store_true",
         help="Generate one pkl per held-out subject.",
+    )
+    parser.add_argument(
+        "--make-fixed-val-test-folds",
+        action="store_true",
+        help=(
+            "Keep --val-subject fixed and generate one pkl per remaining subject as test. "
+            "Each fold uses all other subjects for training."
+        ),
     )
     parser.add_argument(
         "--label-source",
@@ -818,7 +856,31 @@ def main() -> None:
     print(f"[INFO] Subjects: {subjects}")
     print(f"[INFO] Label mapping: {LABEL_TO_ID}")
 
+    if args.val_subject is not None and args.val_subject not in subjects:
+        raise ValueError(
+            f"--val-subject {args.val_subject!r} not found. "
+            f"Available subjects: {subjects}"
+        )
+
+    if args.test_subject is not None and args.test_subject not in subjects:
+        raise ValueError(
+            f"--test-subject {args.test_subject!r} not found. "
+            f"Available subjects: {subjects}"
+        )
+
+    if (
+        args.val_subject is not None
+        and args.test_subject is not None
+        and args.val_subject == args.test_subject
+    ):
+        raise ValueError("--val-subject and --test-subject must be different.")
+
     if args.make_all_loso:
+        if args.test_subject is not None:
+            raise ValueError("--test-subject cannot be used with --make-all-loso.")
+        if args.make_fixed_val_test_folds:
+            raise ValueError("--make-all-loso and --make-fixed-val-test-folds are mutually exclusive.")
+
         for subject in subjects:
             split = make_split(annotations, val_subject=subject)
             save_dataset(
@@ -831,13 +893,44 @@ def main() -> None:
             )
         return
 
-    if args.val_subject is not None and args.val_subject not in subjects:
+    if args.make_fixed_val_test_folds:
+        if args.val_subject is None:
+            raise ValueError("--make-fixed-val-test-folds requires --val-subject.")
+        if args.test_subject is not None:
+            raise ValueError("--test-subject cannot be used with --make-fixed-val-test-folds.")
+
+        test_subjects = [subject for subject in subjects if subject != args.val_subject]
+        print(
+            f"[INFO] Fixed validation subject: {args.val_subject}; "
+            f"creating {len(test_subjects)} test folds."
+        )
+        for test_subject in test_subjects:
+            split = make_split(
+                annotations,
+                val_subject=args.val_subject,
+                test_subject=test_subject,
+            )
+            save_dataset(
+                annotations=annotations,
+                split=split,
+                stats=stats,
+                output_pkl=fixed_val_test_output_path(args.output, args.val_subject, test_subject),
+                clip_len=args.clip_len,
+                val_subject=args.val_subject,
+                test_subject=test_subject,
+            )
+        return
+
+    if args.test_subject is not None and args.val_subject is None:
         raise ValueError(
-            f"--val-subject {args.val_subject!r} not found. "
-            f"Available subjects: {subjects}"
+            "--test-subject requires --val-subject so train/val/test are all explicit."
         )
 
-    split = make_split(annotations, val_subject=args.val_subject)
+    split = make_split(
+        annotations,
+        val_subject=args.val_subject,
+        test_subject=args.test_subject,
+    )
     save_dataset(
         annotations=annotations,
         split=split,
@@ -845,6 +938,7 @@ def main() -> None:
         output_pkl=args.output,
         clip_len=args.clip_len,
         val_subject=args.val_subject,
+        test_subject=args.test_subject,
     )
 
 
