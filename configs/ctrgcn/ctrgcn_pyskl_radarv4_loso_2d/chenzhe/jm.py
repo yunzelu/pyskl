@@ -21,7 +21,7 @@ model = dict(
 )
 
 dataset_type = 'PoseDataset'
-ann_file = 'data/radar_v4/pyskl/radar_v4_yolo26xpose_clip60.pkl'
+ann_file = 'data/radar_v4/pyskl/radarv4_yolo26xpose_clip60_val_mia_test_chenzhe.pkl'
 
 # COCO-17 left/right keypoint ids
 coco_left = [1, 3, 5, 7, 9, 11, 13, 15]
@@ -108,7 +108,7 @@ data = dict(
         type=dataset_type,
         ann_file=ann_file,
         pipeline=test_pipeline,
-        split='val'
+        split='test'
     )
 )
 
@@ -143,4 +143,4 @@ log_config = dict(
 # runtime settings
 log_level = 'INFO'
 
-work_dir = f'./work_dirs/ctrgcn/radar_v4_yolo26xpose_clip60/{stream}'
+work_dir = f'./work_dirs/ctrgcn/radarv4_yolo26xpose_clip60_val_mia_test_chenzhe/{stream}'

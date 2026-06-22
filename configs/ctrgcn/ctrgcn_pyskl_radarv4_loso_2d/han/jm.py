@@ -3,7 +3,8 @@
 # Stream options: 'j', 'b', 'jm', 'bm'
 # ============================================================
 
-stream = 'j'  # change to 'b', 'jm', or 'bm' for other streams
+stream = 'jm'  # change to 'b', 'jm', or 'bm' for other streams
+pkl = 'radarv4_yolo26xpose_clip60_val_mia_test_han'
 
 model = dict(
     type='RecognizerGCN',
@@ -21,7 +22,7 @@ model = dict(
 )
 
 dataset_type = 'PoseDataset'
-ann_file = 'data/radar_v4/pyskl/radar_v4_yolo26xpose_clip60.pkl'
+ann_file = f'data/radar_v4/pyskl/{pkl}.pkl'
 
 # COCO-17 left/right keypoint ids
 coco_left = [1, 3, 5, 7, 9, 11, 13, 15]
@@ -108,7 +109,7 @@ data = dict(
         type=dataset_type,
         ann_file=ann_file,
         pipeline=test_pipeline,
-        split='val'
+        split='test'
     )
 )
 
@@ -126,7 +127,7 @@ optimizer_config = dict(grad_clip=None)
 # learning policy
 lr_config = dict(policy='CosineAnnealing', min_lr=0, by_epoch=False)
 
-total_epochs = 16
+total_epochs = 20
 
 checkpoint_config = dict(interval=1)
 
@@ -143,4 +144,4 @@ log_config = dict(
 # runtime settings
 log_level = 'INFO'
 
-work_dir = f'./work_dirs/ctrgcn/ctrgcn_pyskl_radarv4_2d/{stream}'
+work_dir = f'./work_dirs/ctrgcn/{pkl}/{stream}'
