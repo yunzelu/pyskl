@@ -21,7 +21,7 @@ model = dict(
 )
 
 dataset_type = 'PoseDataset'
-ann_file = 'data/radar_v4/pyskl/radar_v4_yolo26xpose_clip60.pkl'
+ann_file = 'data/radar_v4/pyskl/radar_v4_yolo26xpose_clip60_ds3p123.pkl'
 
 # COCO-17 left/right keypoint ids
 coco_left = [1, 3, 5, 7, 9, 11, 13, 15]
@@ -56,7 +56,7 @@ train_pipeline = [
     dict(type='GenSkeFeat', dataset='coco', feats=[stream]),
 
     # Some samples are already 60 frames; some stationary/long transition samples may be longer.
-    dict(type='UniformSample', clip_len=60),
+    dict(type='UniformSample', clip_len=20),
 
     dict(type='PoseDecode'),
     dict(type='FormatGCNInput', num_person=1),
@@ -67,7 +67,7 @@ train_pipeline = [
 val_pipeline = [
     dict(type='PreNormalize2D', mode='auto'),
     dict(type='GenSkeFeat', dataset='coco', feats=[stream]),
-    dict(type='UniformSample', clip_len=60, num_clips=1),
+    dict(type='UniformSample', clip_len=20, num_clips=1),
     dict(type='PoseDecode'),
     dict(type='FormatGCNInput', num_person=1),
     dict(type='Collect', keys=['keypoint', 'label'], meta_keys=[]),
@@ -77,7 +77,7 @@ val_pipeline = [
 test_pipeline = [
     dict(type='PreNormalize2D', mode='auto'),
     dict(type='GenSkeFeat', dataset='coco', feats=[stream]),
-    dict(type='UniformSample', clip_len=60, num_clips=1),
+    dict(type='UniformSample', clip_len=20, num_clips=1),
     dict(type='PoseDecode'),
     dict(type='FormatGCNInput', num_person=1),
     dict(type='Collect', keys=['keypoint', 'label'], meta_keys=[]),
@@ -143,4 +143,4 @@ log_config = dict(
 # runtime settings
 log_level = 'INFO'
 
-work_dir = f'./work_dirs/ctrgcn/radar_v4_yolo26xpose_clip60/{stream}'
+work_dir = f'./work_dirs/ctrgcn/radar_v4_yolo26xpose_clip60_ds3p123/{stream}'
