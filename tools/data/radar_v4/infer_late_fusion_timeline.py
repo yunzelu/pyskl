@@ -56,11 +56,11 @@ from infer_processed_pose_csv import (
 )
 
 
-DEFAULT_MODEL_DIR = Path("work_dirs/ctrgcn/ctrgcn_pyskl_radarv4_loso_mia_2d")
-DEFAULT_CONFIG_DIR = Path("configs/ctrgcn/ctrgcn_pyskl_radarv4_loso_2d/mia")
+DEFAULT_MODEL_DIR = Path("work_dirs/ctrgcn/radar_v4_yolo26xpose_clip60")
+DEFAULT_CONFIG_DIR = Path("configs/ctrgcn/ctrgcn_pyskl_radarv4_loso_2d")
 DEFAULT_STREAMS = ("j", "jm", "b", "bm")
 DEFAULT_WEIGHTS = (2.0, 1.0, 2.0, 1.0)
-DEFAULT_CHECKPOINT_NAME = "epoch.pth"
+DEFAULT_CHECKPOINT_NAME = "epoch_20.pth"
 
 
 @dataclass(frozen=True)
