@@ -80,7 +80,7 @@ generate_pose_target_test = dict(
 )[stream]
 
 train_pipeline = [
-    dict(type='UniformSampleFrames', clip_len=48),
+    dict(type='UniformSampleFrames', clip_len=60),
     dict(type='PoseDecode'),
     dict(type='PoseCompact', hw_ratio=1., allow_imgpad=True),
     dict(type='Resize', scale=(-1, 64)),
@@ -94,7 +94,7 @@ train_pipeline = [
 ]
 
 val_pipeline = [
-    dict(type='UniformSampleFrames', clip_len=48, num_clips=1),
+    dict(type='UniformSampleFrames', clip_len=60, num_clips=1),
     dict(type='PoseDecode'),
     dict(type='PoseCompact', hw_ratio=1., allow_imgpad=True),
     dict(type='Resize', scale=(64, 64), keep_ratio=False),
@@ -105,7 +105,7 @@ val_pipeline = [
 ]
 
 test_pipeline = [
-    dict(type='UniformSampleFrames', clip_len=48, num_clips=1),
+    dict(type='UniformSampleFrames', clip_len=60, num_clips=1),
     dict(type='PoseDecode'),
     dict(type='PoseCompact', hw_ratio=1., allow_imgpad=True),
     dict(type='Resize', scale=(64, 64), keep_ratio=False),
