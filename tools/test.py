@@ -39,9 +39,15 @@ def parse_args():
         '--eval',
         type=str,
         nargs='+',
-        default=['top_k_accuracy', 'mean_class_accuracy'],
+        default=None,
         help='evaluation metrics, which depends on the dataset, e.g.,'
-        ' "top_k_accuracy", "mean_class_accuracy" for video dataset')
+        ' "top_k_accuracy", "mean_class_accuracy", "macro_f1",'
+        ' "per_class_f1", "confusion_matrix" for video dataset. If omitted,'
+        ' use test_evaluation from the config, then evaluation.')
+    parser.add_argument(
+        '--eval-out',
+        default=None,
+        help='output evaluation metrics file in pkl/yaml/json format')
     parser.add_argument(
         '--tmpdir',
         help='tmp directory used for collecting results from multiple workers')
@@ -115,7 +121,7 @@ def main():
     out = osp.join(cfg.work_dir, 'result.pkl') if args.out is None else args.out
 
     # Load eval_config from cfg
-    eval_cfg = cfg.get('evaluation', {})
+    eval_cfg = cfg.get('test_evaluation', cfg.get('evaluation', {})).copy()
     keys = ['interval', 'tmpdir', 'start', 'save_best', 'rule', 'by_epoch', 'broadcast_bn_buffers']
     for key in keys:
         eval_cfg.pop(key, None)
@@ -172,6 +178,16 @@ def main():
         dataset.dump_results(outputs, out=out)
         if eval_cfg:
             eval_res = dataset.evaluate(outputs, **eval_cfg)
+            if args.eval_out is not None:
+                eval_dir = osp.dirname(args.eval_out)
+                if eval_dir:
+                    mmcv.mkdir_or_exist(eval_dir)
+                _, eval_suffix = osp.splitext(args.eval_out)
+                assert eval_suffix[1:] in file_handlers, (
+                    'The format of the eval output file should be json, '
+                    'pickle or yaml')
+                mmcv.dump(eval_res, args.eval_out)
+                print(f'writing evaluation metrics to {args.eval_out}')
             for name, val in eval_res.items():
                 print(f'{name}: {val:.04f}')
 

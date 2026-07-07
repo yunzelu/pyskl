@@ -155,6 +155,13 @@ evaluation = dict(
     metrics=['top_k_accuracy', 'mean_class_accuracy'],
     topk=(1, 5)
 )
+test_evaluation = dict(
+    metrics=[
+        'top_k_accuracy', 'mean_class_accuracy', 'macro_f1',
+        'per_class_f1', 'confusion_matrix'
+    ],
+    topk=(1, 5)
+)
 log_config = dict(interval=20, hooks=[dict(type='TextLoggerHook')])
 log_level = 'INFO'
 work_dir = f'./work_dirs/posec3d/{pkl}/{stream}'

@@ -117,6 +117,13 @@ evaluation = dict(
     interval=1,
     metrics=['top_k_accuracy', 'mean_class_accuracy']
 )
+test_evaluation = dict(
+    metrics=[
+        'top_k_accuracy', 'mean_class_accuracy', 'macro_f1',
+        'per_class_f1', 'confusion_matrix'
+    ],
+    topk=(1, 5)
+)
 log_config = dict(
     interval=100,
     hooks=[dict(type='TextLoggerHook')]

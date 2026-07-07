@@ -5,7 +5,8 @@ from mmcv.runner import DistEvalHook as BasicDistEvalHook
 
 class DistEvalHook(BasicDistEvalHook):
     greater_keys = [
-        'acc', 'top', 'AR@', 'auc', 'precision', 'mAP@', 'Recall@'
+        'acc', 'top', 'AR@', 'auc', 'precision', 'mAP@', 'Recall@', 'f1',
+        'F1'
     ]
     less_keys = ['loss']
 
@@ -120,6 +121,92 @@ def mean_class_accuracy(scores, labels):
         [hit / cnt if cnt else 0.0 for cnt, hit in zip(cls_cnt, cls_hit)])
 
     return mean_class_acc
+
+
+def _prediction_labels(scores):
+    """Convert per-class scores to top-1 predicted labels."""
+    return np.argmax(scores, axis=1).astype(np.int64)
+
+
+def confusion_matrix_from_scores(scores, labels, normalize=None, num_classes=None):
+    """Compute a fixed-size confusion matrix from prediction scores.
+
+    Rows are ground-truth classes and columns are predicted classes.
+    """
+    pred = _prediction_labels(scores)
+    labels = np.asarray(labels, dtype=np.int64)
+
+    if num_classes is None:
+        scores = np.asarray(scores)
+        if scores.ndim == 2:
+            num_classes = scores.shape[1]
+        else:
+            num_classes = int(max(pred.max(), labels.max()) + 1)
+
+    confusion_mat = np.bincount(
+        num_classes * labels + pred,
+        minlength=num_classes**2).reshape(num_classes, num_classes)
+
+    with np.errstate(all='ignore'):
+        if normalize == 'true':
+            confusion_mat = (
+                confusion_mat / confusion_mat.sum(axis=1, keepdims=True))
+        elif normalize == 'pred':
+            confusion_mat = (
+                confusion_mat / confusion_mat.sum(axis=0, keepdims=True))
+        elif normalize == 'all':
+            confusion_mat = (confusion_mat / confusion_mat.sum())
+        elif normalize is not None:
+            raise ValueError("normalize must be one of {'true', 'pred', "
+                             "'all', None}")
+        confusion_mat = np.nan_to_num(confusion_mat)
+
+    return confusion_mat
+
+
+def precision_recall_f1(scores, labels, num_classes=None):
+    """Calculate per-class precision, recall, F1, and support."""
+    confusion_mat = confusion_matrix_from_scores(
+        scores, labels, num_classes=num_classes).astype(float)
+    tp = np.diag(confusion_mat)
+    pred_cnt = confusion_mat.sum(axis=0)
+    cls_cnt = confusion_mat.sum(axis=1)
+
+    precision = np.divide(
+        tp, pred_cnt, out=np.zeros_like(tp), where=pred_cnt != 0)
+    recall = np.divide(
+        tp, cls_cnt, out=np.zeros_like(tp), where=cls_cnt != 0)
+    denom = precision + recall
+    f1 = np.divide(
+        2 * precision * recall,
+        denom,
+        out=np.zeros_like(tp),
+        where=denom != 0)
+
+    return precision, recall, f1, cls_cnt.astype(np.int64)
+
+
+def f1_score(scores, labels, average='macro', num_classes=None):
+    """Calculate F1 score.
+
+    Args:
+        scores (list[np.ndarray]): Prediction scores for each class.
+        labels (list[int]): Ground truth labels.
+        average (str | None): ``'macro'`` returns the unweighted mean of
+            per-class F1. ``None`` returns all per-class F1 scores.
+        num_classes (int | None): Fixed number of classes. If omitted, this is
+            inferred from the score shape.
+
+    Returns:
+        float | np.ndarray: Macro-F1 or per-class F1.
+    """
+    _, _, f1, _ = precision_recall_f1(
+        scores, labels, num_classes=num_classes)
+    if average is None:
+        return f1
+    if average == 'macro':
+        return np.mean(f1)
+    raise ValueError("average must be one of {'macro', None}")
 
 
 def top_k_accuracy(scores, labels, topk=(1, )):

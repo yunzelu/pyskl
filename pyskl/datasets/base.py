@@ -4,6 +4,7 @@ import copy
 import mmcv
 import numpy as np
 import os.path as osp
+import re
 import torch
 import warnings
 from abc import ABCMeta, abstractmethod
@@ -12,7 +13,9 @@ from mmcv.utils import print_log
 from torch.utils.data import Dataset
 
 from pyskl.smp import auto_mix2
-from ..core import mean_average_precision, mean_class_accuracy, top_k_accuracy
+from ..core import (confusion_matrix_from_scores, f1_score,
+                    mean_average_precision, mean_class_accuracy,
+                    precision_recall_f1, top_k_accuracy)
 from .pipelines import Compose
 
 
@@ -106,6 +109,32 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
         arr[label] = 1.
         return arr
 
+    @staticmethod
+    def _safe_metric_name(name):
+        name = re.sub(r'[^0-9A-Za-z_]+', '_', str(name)).strip('_')
+        return name or 'unnamed'
+
+    def _num_classes_from_results(self, results, gt_labels):
+        if self.num_classes is not None:
+            return self.num_classes
+        scores = np.asarray(results)
+        if scores.ndim == 2:
+            return scores.shape[1]
+        return int(max(gt_labels) + 1)
+
+    def _class_names(self, num_classes):
+        class_names = [f'class_{i}' for i in range(num_classes)]
+        for ann in self.video_infos:
+            label = ann.get('label', None)
+            if not isinstance(label, (int, np.integer)):
+                continue
+            if label < 0 or label >= num_classes:
+                continue
+            label_name = ann.get('label_name', None)
+            if label_name is not None:
+                class_names[label] = str(label_name)
+        return class_names
+
     def evaluate(self,
                  results,
                  metrics='top_k_accuracy',
@@ -172,7 +201,10 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
                 metric_options['top_k_accuracy'], **deprecated_kwargs)
 
         metrics = metrics if isinstance(metrics, (list, tuple)) else [metrics]
-        allowed_metrics = ['top_k_accuracy', 'mean_class_accuracy', 'mean_average_precision']
+        allowed_metrics = [
+            'top_k_accuracy', 'mean_class_accuracy', 'mean_average_precision',
+            'macro_f1', 'per_class_f1', 'confusion_matrix'
+        ]
 
         for metric in metrics:
             if metric not in allowed_metrics:
@@ -180,6 +212,8 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
 
         eval_results = OrderedDict()
         gt_labels = [ann['label'] for ann in self.video_infos]
+        num_classes = self._num_classes_from_results(results, gt_labels)
+        class_names = self._class_names(num_classes)
 
         for metric in metrics:
             msg = f'Evaluating {metric} ...'
@@ -222,6 +256,47 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
                 eval_results['mean_average_precision'] = mAP
                 log_msg = f'\nmean_average_precision\t{mAP:.4f}'
                 print_log(log_msg, logger=logger)
+                continue
+
+            if metric == 'macro_f1':
+                macro_f1 = f1_score(
+                    results, gt_labels, average='macro',
+                    num_classes=num_classes)
+                macro_f1 = float(macro_f1)
+                eval_results['macro_f1'] = macro_f1
+                log_msg = f'\nmacro_f1\t{macro_f1:.4f}'
+                print_log(log_msg, logger=logger)
+                continue
+
+            if metric == 'per_class_f1':
+                _, _, f1, support = precision_recall_f1(
+                    results, gt_labels, num_classes=num_classes)
+                log_msg = ['\nper_class_f1']
+                for label, (name, f1_value, support_value) in enumerate(
+                        zip(class_names, f1, support)):
+                    key = (
+                        f'per_class_f1_{label}_'
+                        f'{self._safe_metric_name(name)}')
+                    f1_value = float(f1_value)
+                    eval_results[key] = f1_value
+                    log_msg.append(
+                        f'\n{label}:{name}\t{f1_value:.4f}'
+                        f'\tsupport={support_value}')
+                print_log(''.join(log_msg), logger=logger)
+                continue
+
+            if metric == 'confusion_matrix':
+                cf_mat = confusion_matrix_from_scores(
+                    results, gt_labels, num_classes=num_classes)
+                header = '\t'.join(str(i) for i in range(num_classes))
+                log_msg = [f'\nconfusion_matrix rows=true cols=pred\n\t{header}']
+                for i, row in enumerate(cf_mat):
+                    log_msg.append(
+                        f'\n{i}:{class_names[i]}\t' +
+                        '\t'.join(str(int(x)) for x in row))
+                    for j, val in enumerate(row):
+                        eval_results[f'confusion_matrix_{i}_{j}'] = int(val)
+                print_log(''.join(log_msg), logger=logger)
                 continue
 
         return eval_results

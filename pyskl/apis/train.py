@@ -3,6 +3,7 @@ import numpy as np
 import os
 import os.path as osp
 import time
+import mmcv
 import torch
 import torch.distributed as dist
 from mmcv.engine import multi_gpu_test
@@ -199,7 +200,8 @@ def train_model(model,
                 out = osp.join(cfg.work_dir, f'{name}_pred.pkl')
                 test_dataset.dump_results(outputs, out)
 
-                eval_cfg = cfg.get('evaluation', {})
+                eval_cfg = cfg.get('test_evaluation',
+                                   cfg.get('evaluation', {})).copy()
                 for key in [
                         'interval', 'tmpdir', 'start',
                         'save_best', 'rule', 'by_epoch', 'broadcast_bn_buffers'
@@ -207,6 +209,9 @@ def train_model(model,
                     eval_cfg.pop(key, None)
 
                 eval_res = test_dataset.evaluate(outputs, **eval_cfg)
+                eval_out = osp.join(cfg.work_dir, f'{name}_eval.json')
+                mmcv.dump(eval_res, eval_out)
                 logger.info(f'Testing results of the {name} checkpoint')
+                logger.info(f'Testing metrics saved to {eval_out}')
                 for metric_name, val in eval_res.items():
                     logger.info(f'{metric_name}: {val:.04f}')
