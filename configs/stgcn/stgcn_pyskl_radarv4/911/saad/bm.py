@@ -1,18 +1,18 @@
 # ============================================================
-# CTR-GCN on RADAR v4 YOLO26x-pose skeletons, LOSO fold
+# ST-GCN on RADAR v4 YOLO26x-pose skeletons, LOSO fold
 # Stream options: 'j', 'b', 'jm', 'bm'
 # ============================================================
 
-stream = 'b'  # change to 'b', 'jm', or 'bm' for other streams
-pkl_file = 'radarv4_yolo26xpose_clip60_val_mia_test_chenzhe'
+stream = 'bm'
+pkl = 'radarv4_yolo26xpose_clip60_val_mia_test_saad'
 
 model = dict(
     type='RecognizerGCN',
     backbone=dict(
-        type='CTRGCN',
-        in_channels=3,      # x, y, score. If no keypoint_score exists, change to 2.
+        type='STGCN',
+        in_channels=3,
         num_person=1,
-        graph_cfg=dict(layout='coco', mode='spatial')
+        graph_cfg=dict(layout='coco', mode='stgcn_spatial')
     ),
     cls_head=dict(
         type='GCNHead',
@@ -22,7 +22,7 @@ model = dict(
 )
 
 dataset_type = 'PoseDataset'
-ann_file = f'data/radar_v4/pyskl/{pkl_file}.pkl'
+ann_file = f'data/radar_v4/pyskl/911/{pkl}.pkl'
 
 # COCO-17 left/right keypoint ids
 coco_left = [1, 3, 5, 7, 9, 11, 13, 15]
@@ -41,7 +41,6 @@ coco_right = [2, 4, 6, 8, 10, 12, 14, 16]
 class_prob = [2.00, 1.00, 2.00, 2.00, 2.00, 2.00, 1.00, 1.00, 1.00]
 
 train_pipeline = [
-    # Flip must be before PreNormalize2D because Flip uses raw pixel x coordinate.
     dict(
         type='Flip',
         flip_ratio=0.5,
@@ -49,16 +48,9 @@ train_pipeline = [
         left_kp=coco_left,
         right_kp=coco_right
     ),
-
-    # Normalize 2D keypoints. Make sure img_shape exists correctly in the PKL.
     dict(type='PreNormalize2D', mode='auto'),
-
-    # stream = 'j', 'b', 'jm', or 'bm'
     dict(type='GenSkeFeat', dataset='coco', feats=[stream]),
-
-    # Some samples are already 60 frames; some stationary/long transition samples may be longer.
     dict(type='UniformSample', clip_len=60),
-
     dict(type='PoseDecode'),
     dict(type='FormatGCNInput', num_person=1),
     dict(type='Collect', keys=['keypoint', 'label'], meta_keys=[]),
@@ -89,7 +81,6 @@ data = dict(
     videos_per_gpu=16,
     workers_per_gpu=2,
     test_dataloader=dict(videos_per_gpu=1),
-
     train=dict(
         type=dataset_type,
         ann_file=ann_file,
@@ -97,14 +88,12 @@ data = dict(
         split='train',
         class_prob=class_prob
     ),
-
     val=dict(
         type=dataset_type,
         ann_file=ann_file,
         pipeline=val_pipeline,
         split='val'
     ),
-
     test=dict(
         type=dataset_type,
         ann_file=ann_file,
@@ -113,7 +102,6 @@ data = dict(
     )
 )
 
-# optimizer
 optimizer = dict(
     type='SGD',
     lr=0.05,
@@ -121,27 +109,17 @@ optimizer = dict(
     weight_decay=0.0005,
     nesterov=True
 )
-
 optimizer_config = dict(grad_clip=None)
-
-# learning policy
 lr_config = dict(policy='CosineAnnealing', min_lr=0, by_epoch=False)
-
 total_epochs = 20
-
 checkpoint_config = dict(interval=1)
-
 evaluation = dict(
     interval=1,
     metrics=['top_k_accuracy', 'mean_class_accuracy']
 )
-
 log_config = dict(
     interval=100,
     hooks=[dict(type='TextLoggerHook')]
 )
-
-# runtime settings
 log_level = 'INFO'
-
-work_dir = f'./work_dirs/ctrgcn/{pkl_file}/{stream}'
+work_dir = f'./work_dirs/stgcn/{pkl}/{stream}'
