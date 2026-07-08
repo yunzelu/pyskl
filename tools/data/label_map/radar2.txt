@@ -1,9 +1,0 @@
-Falling
-Lay-Stationary
-Sit-Stationary
-Transition-LayBed-to-Sit
-Transition-LayFloor-to-Stand
-Transition-Sit-to-LayBed
-Transition-Sit-to-Stand
-Transition-Stand-to-Sit
-Walking
