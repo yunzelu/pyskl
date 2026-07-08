@@ -15,6 +15,15 @@ Example:
         D:/lu/project/auto_labeling_pipeline/data/Willowbend/618/260614/processed_pose_fps30 ^
         --output D:/tmp/radarv4_predictions.csv ^
         --overwrite
+
+PoseC3D single-stream example:
+    python tools/data/radar_v4/infer_processed_pose_csv.py ^
+        D:/lu/project/auto_labeling_pipeline/data/Willowbend/618/260614/processed_pose_fps30 ^
+        --baseline posec3d ^
+        --subject chenzhe ^
+        --stream joint ^
+        --output D:/tmp/radarv4_posec3d_joint_predictions.csv ^
+        --overwrite
 """
 
 from __future__ import annotations
@@ -28,10 +37,18 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
+DEFAULT_BASELINE = "ctrgcn"
+DEFAULT_CTRGCN_STREAM = "jm"
+DEFAULT_POSEC3D_STREAM = "joint"
+DEFAULT_SUBJECT = "chenzhe"
+DEFAULT_CHECKPOINT_NAME = "latest.pth"
+
 DEFAULT_CONFIG = Path("configs/ctrgcn/ctrgcn_pyskl_radarv4_loso_2d/jm.py")
 DEFAULT_CHECKPOINT = Path(
     r"work_dirs/ctrgcn/ctrgcn_pyskl_radarv4_loso_mia_2d/jm/epoch_14.pth"
 )
+DEFAULT_POSEC3D_CONFIG_ROOT = Path("configs/posec3d/slowonly_r50_radarv4/911")
+DEFAULT_POSEC3D_WORK_ROOT = Path("work_dirs/posec3d")
 DEFAULT_LABEL_MAP = Path("tools/data/label_map/radarv4.txt")
 NUM_KEYPOINTS = 17
 
@@ -772,10 +789,58 @@ def write_predictions(
             )
 
 
-def default_output_path(input_path: Path) -> Path:
+def pkl_name(subject: str) -> str:
+    return f"radarv4_yolo26xpose_clip60_val_mia_test_{subject}"
+
+
+def default_posec3d_config_path(subject: str, stream: str) -> Path:
+    return DEFAULT_POSEC3D_CONFIG_ROOT / subject / f"{stream}.py"
+
+
+def default_posec3d_checkpoint_path(
+    subject: str,
+    stream: str,
+    checkpoint_name: str,
+) -> Path:
+    return DEFAULT_POSEC3D_WORK_ROOT / pkl_name(subject) / stream / checkpoint_name
+
+
+def resolve_model_paths(args: argparse.Namespace) -> tuple[Path, Path]:
+    if args.baseline == "posec3d":
+        config_path = args.config or default_posec3d_config_path(args.subject, args.stream)
+        checkpoint_path = args.checkpoint or default_posec3d_checkpoint_path(
+            args.subject,
+            args.stream,
+            args.checkpoint_name,
+        )
+    else:
+        config_path = args.config or DEFAULT_CONFIG
+        checkpoint_path = args.checkpoint or DEFAULT_CHECKPOINT
+
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config not found: {config_path}")
+    if not checkpoint_path.exists():
+        raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+    return config_path, checkpoint_path
+
+
+def default_output_path(
+    input_path: Path,
+    baseline: str = DEFAULT_BASELINE,
+    stream: str | None = None,
+) -> Path:
+    if baseline == "posec3d":
+        suffix = f"_posec3d_{stream or DEFAULT_POSEC3D_STREAM}_predictions.csv"
+        directory_name = (
+            f"radarv4_posec3d_{stream or DEFAULT_POSEC3D_STREAM}_predictions.csv"
+        )
+    else:
+        suffix = "_predictions.csv"
+        directory_name = "radarv4_predictions.csv"
+
     if input_path.is_file():
-        return input_path.with_name(f"{input_path.stem}_predictions.csv")
-    return input_path / "radarv4_predictions.csv"
+        return input_path.with_name(f"{input_path.stem}{suffix}")
+    return input_path / directory_name
 
 
 def resolve_device(device: str) -> str:
@@ -788,7 +853,7 @@ def resolve_device(device: str) -> str:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run CTR-GCN radar v4 inference on processed YOLO pose CSV frames."
+        description="Run radar v4 PySKL inference on processed YOLO pose CSV frames."
     )
     parser.add_argument(
         "input_path",
@@ -798,14 +863,50 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        help="Output prediction CSV. Default: *_predictions.csv for a file, or radarv4_predictions.csv in a directory.",
+        help="Output prediction CSV. Default is input-derived and includes PoseC3D stream when --baseline posec3d.",
     )
-    parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
-    parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
+    parser.add_argument(
+        "--baseline",
+        choices=["ctrgcn", "posec3d"],
+        default=DEFAULT_BASELINE,
+        help="Default model family to resolve when --config/--checkpoint are omitted.",
+    )
+    parser.add_argument(
+        "--subject",
+        default=DEFAULT_SUBJECT,
+        help="LOSO test subject used for PoseC3D default config/checkpoint paths.",
+    )
+    parser.add_argument(
+        "--stream",
+        choices=["j", "b", "jm", "bm", "joint", "limb"],
+        help=(
+            "Model stream. Defaults to jm for CTRGCN legacy paths and joint for PoseC3D. "
+            "For explicit --config/--checkpoint this only affects default output naming."
+        ),
+    )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        help="Config path. For PoseC3D default: configs/posec3d/slowonly_r50_radarv4/911/<subject>/<stream>.py.",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        type=Path,
+        help="Checkpoint path. For PoseC3D default: work_dirs/posec3d/<fold>/<stream>/<checkpoint-name>.",
+    )
+    parser.add_argument(
+        "--checkpoint-name",
+        default=DEFAULT_CHECKPOINT_NAME,
+        help="Checkpoint filename used when resolving PoseC3D default checkpoint paths.",
+    )
     parser.add_argument("--label-map", type=Path, default=DEFAULT_LABEL_MAP)
     parser.add_argument("--window-size", type=int, default=60)
     parser.add_argument("--stride", type=int, default=30)
-    parser.add_argument("--batch-size", type=int, default=128)
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        help="Inference batch size. Default: 128 for CTRGCN, 16 for PoseC3D.",
+    )
     parser.add_argument(
         "--timeline-mode",
         choices=["center", "window-average"],
@@ -885,6 +986,19 @@ def main() -> None:
 
     import numpy as np
 
+    if args.stream is None:
+        args.stream = (
+            DEFAULT_POSEC3D_STREAM
+            if args.baseline == "posec3d"
+            else DEFAULT_CTRGCN_STREAM
+        )
+    if args.baseline == "posec3d" and args.stream not in {"joint", "limb"}:
+        raise ValueError("--baseline posec3d requires --stream joint or --stream limb")
+    if args.baseline == "ctrgcn" and args.stream not in {"j", "b", "jm", "bm"}:
+        raise ValueError("--baseline ctrgcn requires --stream j, b, jm, or bm")
+    if args.batch_size is None:
+        args.batch_size = 16 if args.baseline == "posec3d" else 128
+
     if args.window_size <= 0:
         raise ValueError("--window-size must be positive")
     if args.stride <= 0:
@@ -897,7 +1011,12 @@ def main() -> None:
         raise ValueError("--min-valid-frames must be non-negative")
 
     input_path = args.input_path
-    output_path = args.output or default_output_path(input_path)
+    output_path = args.output or default_output_path(
+        input_path,
+        baseline=args.baseline,
+        stream=args.stream,
+    )
+    config_path, checkpoint_path = resolve_model_paths(args)
     csv_paths = iter_csv_paths(input_path)
     if not csv_paths:
         raise ValueError(f"No CSV files found in {input_path}")
@@ -907,6 +1026,9 @@ def main() -> None:
 
     if not args.quiet:
         print(f"[INFO] Reading {len(csv_paths)} CSV file(s)")
+        print(f"[INFO] Baseline={args.baseline}, stream={args.stream}")
+        print(f"[INFO] Config: {config_path}")
+        print(f"[INFO] Checkpoint: {checkpoint_path}")
 
     grid = read_frame_grid(
         csv_paths=csv_paths,
@@ -931,8 +1053,8 @@ def main() -> None:
 
     window_predictions, covering_windows, total_windows = infer_window_predictions(
         grid=grid,
-        config_path=args.config,
-        checkpoint_path=args.checkpoint,
+        config_path=config_path,
+        checkpoint_path=checkpoint_path,
         window_size=args.window_size,
         stride=args.stride,
         labels=labels,
