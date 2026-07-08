@@ -1,5 +1,5 @@
 Falling
-Lying-Stationary
+Lie-Stationary
 Sit-Stationary
 Transition-Lie-to-Sit
 Transition-Lie-to-Stand
