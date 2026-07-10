@@ -152,8 +152,10 @@ total_epochs = 20
 checkpoint_config = dict(interval=1)
 evaluation = dict(
     interval=1,
-    metrics=['top_k_accuracy', 'mean_class_accuracy'],
-    topk=(1, 5)
+    metrics=['top_k_accuracy', 'mean_class_accuracy', 'macro_f1'],
+    topk=(1, 5),
+    save_best='macro_f1',
+    rule='greater'
 )
 test_evaluation = dict(
     metrics=[

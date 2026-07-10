@@ -132,7 +132,9 @@ checkpoint_config = dict(interval=1)
 
 evaluation = dict(
     interval=1,
-    metrics=['top_k_accuracy', 'mean_class_accuracy']
+    metrics=['top_k_accuracy', 'mean_class_accuracy', 'macro_f1'],
+    save_best='macro_f1',
+    rule='greater'
 )
 
 log_config = dict(
