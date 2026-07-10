@@ -701,6 +701,64 @@ def build_timeline_scores(
     raise ValueError(f"Unsupported timeline mode: {timeline_mode}")
 
 
+def valid_window_coverage(
+    total_frames: int,
+    window_predictions: list[WindowPrediction],
+) -> np.ndarray:
+    import numpy as np
+
+    keep = np.zeros(total_frames, dtype=bool)
+    for prediction in window_predictions:
+        keep[prediction.start:prediction.end] = True
+    return keep
+
+
+def mask_timeline_predictions(
+    timeline: TimelineScores,
+    keep: np.ndarray,
+) -> tuple[TimelineScores, int]:
+    import numpy as np
+
+    if keep.shape[0] != timeline.contributing_windows.shape[0]:
+        raise ValueError("Frame mask length does not match timeline length")
+
+    masked_count = int(np.count_nonzero((~keep) & (timeline.contributing_windows > 0)))
+    if masked_count == 0:
+        return timeline, 0
+
+    scores = timeline.scores.copy()
+    contributing_windows = timeline.contributing_windows.copy()
+    assigned_centers = timeline.assigned_centers.copy()
+    assigned_window_starts = timeline.assigned_window_starts.copy()
+    assigned_window_ends = timeline.assigned_window_ends.copy()
+    center_distances = timeline.center_distances.copy()
+
+    scores[~keep] = 0
+    contributing_windows[~keep] = 0
+    assigned_centers[~keep] = -1
+    assigned_window_starts[~keep] = -1
+    assigned_window_ends[~keep] = -1
+    center_distances[~keep] = -1
+
+    return (
+        TimelineScores(
+            scores=scores,
+            contributing_windows=contributing_windows,
+            assigned_centers=assigned_centers,
+            assigned_window_starts=assigned_window_starts,
+            assigned_window_ends=assigned_window_ends,
+            center_distances=center_distances,
+        ),
+        masked_count,
+    )
+
+
+def resolve_frame_mask_mode(baseline: str, frame_mask: str) -> str:
+    if frame_mask != "auto":
+        return frame_mask
+    return "both" if baseline == "posec3d" else "none"
+
+
 def write_predictions(
     output_path: Path,
     grid: FrameGrid,
@@ -918,6 +976,16 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--frame-mask",
+        choices=["auto", "none", "empty", "valid-window", "both"],
+        default="auto",
+        help=(
+            "Frame-level mask after window inference. auto keeps legacy dense CTRGCN "
+            "output, but for PoseC3D masks frames with no selected skeleton and frames "
+            "outside any window that passed --min-valid-ratio/--min-valid-frames."
+        ),
+    )
+    parser.add_argument(
         "--device",
         default="auto",
         help="Torch device, for example cuda:0 or cpu. Default: auto.",
@@ -1072,6 +1140,22 @@ def main() -> None:
         window_predictions=window_predictions,
         timeline_mode=args.timeline_mode,
     )
+    frame_mask_mode = resolve_frame_mask_mode(args.baseline, args.frame_mask)
+    masked_outside_valid_window = 0
+    masked_empty_frames = 0
+    if frame_mask_mode in {"valid-window", "both"}:
+        timeline, masked_outside_valid_window = mask_timeline_predictions(
+            timeline=timeline,
+            keep=valid_window_coverage(
+                total_frames=grid.total_frames,
+                window_predictions=window_predictions,
+            ),
+        )
+    if frame_mask_mode in {"empty", "both"}:
+        timeline, masked_empty_frames = mask_timeline_predictions(
+            timeline=timeline,
+            keep=grid.selected_detection,
+        )
 
     write_predictions(
         output_path=output_path,
@@ -1087,6 +1171,14 @@ def main() -> None:
         print(f"[DONE] Wrote {grid.total_frames} frame predictions to {output_path}")
         print(f"[DONE] Valid windows: {len(window_predictions)}/{total_windows}")
         print(f"[DONE] Frames with model predictions: {predicted_frames}")
+        print(f"[DONE] Frame mask mode: {frame_mask_mode}")
+        if frame_mask_mode in {"valid-window", "both"}:
+            print(
+                "[DONE] Masked frames outside valid windows: "
+                f"{masked_outside_valid_window}"
+            )
+        if frame_mask_mode in {"empty", "both"}:
+            print(f"[DONE] Masked empty-frame predictions: {masked_empty_frames}")
 
 
 if __name__ == "__main__":

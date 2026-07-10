@@ -2,6 +2,7 @@
 
 Metrics:
     Acc: framewise accuracy on frames with a valid ground-truth label.
+    CenterTimeAcc: accuracy sampled at sliding-window centers.
     Edit: normalized segmental edit score, where 100 is best.
     F1@10/25/50: segmental F1 at IoU thresholds 10%, 25%, and 50%.
 
@@ -300,10 +301,65 @@ def framewise_accuracy(gt_labels: list[str], pred_labels: list[str]) -> float:
     return correct / len(gt_labels) * 100.0
 
 
+def center_time_accuracy(
+    gt_timeline: list[str | None],
+    pred_timeline: list[str],
+    valid_labels: set[str],
+    window_size: int,
+    stride: int,
+) -> dict[str, Any]:
+    if window_size <= 0:
+        raise ValueError("center window size must be positive")
+    if stride <= 0:
+        raise ValueError("center stride must be positive")
+
+    total_frames = min(len(gt_timeline), len(pred_timeline))
+    if total_frames <= 0:
+        return {
+            "accuracy": 0.0,
+            "correct": 0,
+            "samples": 0,
+            "start_frame": None,
+            "end_frame": None,
+        }
+
+    correct = 0
+    samples = 0
+    sampled_centers: list[int] = []
+
+    last_start = total_frames - window_size
+    starts = list(range(0, last_start + 1, stride)) if last_start >= 0 else []
+
+    for start in starts:
+        center_frame = start + window_size // 2
+        if center_frame >= total_frames:
+            continue
+
+        gt_label = gt_timeline[center_frame]
+        if gt_label is None:
+            continue
+
+        pred_label = normalize_prediction_label(pred_timeline[center_frame], valid_labels)
+        samples += 1
+        sampled_centers.append(center_frame)
+        if gt_label == pred_label:
+            correct += 1
+
+    return {
+        "accuracy": correct / samples * 100.0 if samples else 0.0,
+        "correct": correct,
+        "samples": samples,
+        "start_frame": sampled_centers[0] if sampled_centers else None,
+        "end_frame": sampled_centers[-1] if sampled_centers else None,
+    }
+
+
 def evaluate(
     predictions_path: Path,
     origin_session: Path,
     label_map_path: Path,
+    center_window_size: int = 60,
+    center_stride: int = 10,
 ) -> dict[str, Any]:
     labels = load_label_map(label_map_path)
     valid_labels = set(labels)
@@ -320,8 +376,16 @@ def evaluate(
     )
 
     edit, raw_edit_distance = edit_score(gt_eval, pred_eval)
+    center_time = center_time_accuracy(
+        gt_timeline=gt_timeline,
+        pred_timeline=pred_timeline,
+        valid_labels=valid_labels,
+        window_size=center_window_size,
+        stride=center_stride,
+    )
     metrics = {
         "Acc": framewise_accuracy(gt_eval, pred_eval),
+        "CenterTimeAcc": center_time["accuracy"],
         "Edit": edit,
         "EditDistance": raw_edit_distance,
         "F1@10": f1_at_threshold(gt_eval, pred_eval, 0.10),
@@ -346,8 +410,21 @@ def evaluate(
         "num_gt_segments": len(gt_segments),
         "num_pred_segments": len(pred_segments),
         "metrics_percent": metrics,
+        "center_time_accuracy": {
+            "window_size": center_window_size,
+            "stride": center_stride,
+            "center_offset": center_window_size // 2,
+            "samples": center_time["samples"],
+            "correct": center_time["correct"],
+            "sampled_frame_range": {
+                "start_frame": center_time["start_frame"],
+                "end_frame": center_time["end_frame"],
+            },
+        },
         "note": (
             "Metrics are computed only on frames with valid ground-truth labels. "
+            "CenterTimeAcc samples sliding-window center frames and compares each "
+            "center prediction to the frame_labels.csv annotation at that frame. "
             "Edit is normalized segmental edit score, where 100 is best."
         ),
         "prediction_rows": len(prediction_rows),
@@ -373,6 +450,18 @@ def parse_args() -> argparse.Namespace:
         help="Session folder under data/radar_v4/origin, e.g. data/radar_v4/origin/3-han-laysofa.",
     )
     parser.add_argument("--label-map", type=Path, default=DEFAULT_LABEL_MAP)
+    parser.add_argument(
+        "--center-window-size",
+        type=int,
+        default=60,
+        help="Sliding-window size for CenterTimeAcc. Default: 60 frames.",
+    )
+    parser.add_argument(
+        "--center-stride",
+        type=int,
+        default=10,
+        help="Sliding-window stride for CenterTimeAcc. Default: 10 frames.",
+    )
     parser.add_argument("--output-json", type=Path, help="Optional metrics JSON output path.")
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
@@ -384,11 +473,14 @@ def main() -> None:
         predictions_path=args.predictions,
         origin_session=args.origin_session,
         label_map_path=args.label_map,
+        center_window_size=args.center_window_size,
+        center_stride=args.center_stride,
     )
 
     metrics = result["metrics_percent"]
     print(f"[INFO] Frames evaluated: {result['frames_evaluated']}")
     print(f"Acc:   {metrics['Acc']:.4f}")
+    print(f"CenterTimeAcc: {metrics['CenterTimeAcc']:.4f}")
     print(f"Edit:  {metrics['Edit']:.4f}")
     print(f"F1@10: {metrics['F1@10']:.4f}")
     print(f"F1@25: {metrics['F1@25']:.4f}")
