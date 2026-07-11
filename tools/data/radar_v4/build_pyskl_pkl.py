@@ -11,6 +11,15 @@ Example:
         --output data/radar_v4/pyskl/radar_v4_yolo26xpose_clip60.pkl ^
         --clip-len 60 ^
         --val-subject saad
+
+8/1/1/1 example:
+    python tools/data/radar_v4/build_pyskl_pkl.py ^
+        --jsonl-root data/radar_v4/raw_jsonl/yolo26xpose ^
+        --output data/radar_v4/pyskl/8111/radarv4_yolo26xpose_clip60_8111_fold_a_val_han_calib_dengdeng_test_chenzhe.pkl ^
+        --clip-len 60 ^
+        --val-subject han ^
+        --calibration-subject dengdeng ^
+        --test-subject chenzhe
 """
 
 from __future__ import annotations
@@ -644,16 +653,24 @@ def make_split(
     annotations: list[dict[str, Any]],
     val_subject: str | None,
     test_subject: str | None = None,
+    calibration_subject: str | None = None,
 ) -> dict[str, list[str]]:
-    if val_subject is not None and test_subject is not None and val_subject == test_subject:
-        raise ValueError("Validation and test subjects must be different.")
+    held_out_subjects = [
+        subject
+        for subject in (val_subject, calibration_subject, test_subject)
+        if subject is not None
+    ]
+    if len(held_out_subjects) != len(set(held_out_subjects)):
+        raise ValueError("Validation, calibration, and test subjects must be different.")
 
-    split = {"train": [], "val": [], "test": []}
+    split = {"train": [], "val": [], "calib": [], "test": []}
 
     for item in annotations:
         subject = str(item["subject"])
         if val_subject is not None and subject == val_subject:
             target = "val"
+        elif calibration_subject is not None and subject == calibration_subject:
+            target = "calib"
         elif test_subject is not None and subject == test_subject:
             target = "test"
         else:
@@ -689,6 +706,7 @@ def make_summary(
     clip_len: int,
     val_subject: str | None,
     test_subject: str | None,
+    calibration_subject: str | None = None,
 ) -> dict[str, Any]:
     by_split = {
         split_name: count_by_class(annotations, ids)
@@ -699,10 +717,12 @@ def make_summary(
         "output_pkl": str(output_pkl),
         "clip_len": clip_len,
         "val_subject": val_subject,
+        "calibration_subject": calibration_subject,
         "test_subject": test_subject,
         "num_annotations": len(annotations),
         "num_train": len(split["train"]),
         "num_val": len(split["val"]),
+        "num_calib": len(split.get("calib", [])),
         "num_test": len(split["test"]),
         "label_to_id": LABEL_TO_ID,
         "samples_per_class": count_by_class(annotations),
@@ -733,6 +753,7 @@ def save_dataset(
     clip_len: int,
     val_subject: str | None,
     test_subject: str | None = None,
+    calibration_subject: str | None = None,
 ) -> None:
     output_pkl.parent.mkdir(parents=True, exist_ok=True)
     with output_pkl.open("wb") as f:
@@ -753,6 +774,7 @@ def save_dataset(
         clip_len=clip_len,
         val_subject=val_subject,
         test_subject=test_subject,
+        calibration_subject=calibration_subject,
     )
     summary_path = output_pkl.with_name(f"{output_pkl.stem}_summary.json")
     with summary_path.open("w", encoding="utf-8") as f:
@@ -761,7 +783,8 @@ def save_dataset(
     print(
         f"[DONE] {output_pkl} "
         f"(annotations={len(annotations)}, train={len(split['train'])}, "
-        f"val={len(split['val'])}, test={len(split['test'])})"
+        f"val={len(split['val'])}, calib={len(split.get('calib', []))}, "
+        f"test={len(split['test'])})"
     )
     print(f"[DONE] Summary: {summary_path}")
 
@@ -816,6 +839,11 @@ def parse_args() -> argparse.Namespace:
         help="Held-out subject id/name for the test split.",
     )
     parser.add_argument(
+        "--calibration-subject",
+        default=None,
+        help="Held-out subject id/name for the calibration split.",
+    )
+    parser.add_argument(
         "--make-all-loso",
         action="store_true",
         help="Generate one pkl per held-out subject.",
@@ -868,16 +896,25 @@ def main() -> None:
             f"Available subjects: {subjects}"
         )
 
-    if (
-        args.val_subject is not None
-        and args.test_subject is not None
-        and args.val_subject == args.test_subject
-    ):
-        raise ValueError("--val-subject and --test-subject must be different.")
+    if args.calibration_subject is not None and args.calibration_subject not in subjects:
+        raise ValueError(
+            f"--calibration-subject {args.calibration_subject!r} not found. "
+            f"Available subjects: {subjects}"
+        )
+
+    held_out_subjects = [
+        subject
+        for subject in (args.val_subject, args.calibration_subject, args.test_subject)
+        if subject is not None
+    ]
+    if len(held_out_subjects) != len(set(held_out_subjects)):
+        raise ValueError("--val-subject, --calibration-subject, and --test-subject must be different.")
 
     if args.make_all_loso:
         if args.test_subject is not None:
             raise ValueError("--test-subject cannot be used with --make-all-loso.")
+        if args.calibration_subject is not None:
+            raise ValueError("--calibration-subject cannot be used with --make-all-loso.")
         if args.make_fixed_val_test_folds:
             raise ValueError("--make-all-loso and --make-fixed-val-test-folds are mutually exclusive.")
 
@@ -898,6 +935,8 @@ def main() -> None:
             raise ValueError("--make-fixed-val-test-folds requires --val-subject.")
         if args.test_subject is not None:
             raise ValueError("--test-subject cannot be used with --make-fixed-val-test-folds.")
+        if args.calibration_subject is not None:
+            raise ValueError("--calibration-subject cannot be used with --make-fixed-val-test-folds.")
 
         test_subjects = [subject for subject in subjects if subject != args.val_subject]
         print(
@@ -925,11 +964,19 @@ def main() -> None:
         raise ValueError(
             "--test-subject requires --val-subject so train/val/test are all explicit."
         )
+    if args.calibration_subject is not None and (
+        args.val_subject is None or args.test_subject is None
+    ):
+        raise ValueError(
+            "--calibration-subject requires --val-subject and --test-subject "
+            "so train/val/calib/test are all explicit."
+        )
 
     split = make_split(
         annotations,
         val_subject=args.val_subject,
         test_subject=args.test_subject,
+        calibration_subject=args.calibration_subject,
     )
     save_dataset(
         annotations=annotations,
@@ -939,6 +986,7 @@ def main() -> None:
         clip_len=args.clip_len,
         val_subject=args.val_subject,
         test_subject=args.test_subject,
+        calibration_subject=args.calibration_subject,
     )
 
 
