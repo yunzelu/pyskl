@@ -3,7 +3,7 @@
 #SBATCH --gpus-per-node=a100:4
 #SBATCH --cpus-per-task=12         
 #SBATCH --mem=62G                  
-#SBATCH --time=04:00:00  
+#SBATCH --time=10:00:00  
 #SBATCH --job-name=e1_train_and_eval         
 #SBATCH --output=thesis/e1/%x_%j.out
 #SBATCH --mail-user=yunzelu@outlook.com
@@ -35,9 +35,9 @@ for subject in "${SUBJECTS[@]}"; do
   bash tools/dist_train.sh "configs/posec3d/slowonly_r50_radarv4/911/${subject}/joint.py" 4 --validate --test-best --seed 42 --deterministic
 done
 
-for subject in "${SUBJECTS[@]}"; do
-  bash tools/dist_train.sh "configs/ctrgcn/ctrgcn_pyskl_radarv4/911/${subject}/j.py" 4 --validate --test-best --seed 42 --deterministic
-done
+# for subject in "${SUBJECTS[@]}"; do
+#   bash tools/dist_train.sh "configs/ctrgcn/ctrgcn_pyskl_radarv4/911/${subject}/j.py" 4 --validate --test-best --seed 42 --deterministic
+# done
 
 for subject in "${SUBJECTS[@]}"; do
   bash tools/dist_train.sh "configs/stgcn++/stgcn++_radarv4/911/${subject}/j.py" 4 --validate --test-best --seed 42 --deterministic
