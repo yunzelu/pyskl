@@ -3,7 +3,7 @@
 #SBATCH --gpus=a100_3g.20gb:1
 #SBATCH --cpus-per-task=6
 #SBATCH --mem=31G
-#SBATCH --time=02:00:00
+#SBATCH --time=05:00:00
 #SBATCH --job-name=e2_infer
 #SBATCH --output=thesis/e2/%x_%j.out
 #SBATCH --mail-user=yunzelu@outlook.com
@@ -16,5 +16,6 @@ cd ~/projects/def-mbolic/yunzelu/pyskl/
 
 export CUDA_VISIBLE_DEVICES=0
 
-# python thesis/e3/infer_logits.py --stream joint --overwrite
-python thesis/e3/infer_logits.py --stream limb  --overwrite
+python thesis/e3/infer_logits.py --stream limb --split both --overwrite
+python thesis/e3/fit_temperature.py --stream limb --overwrite
+python thesis/e3/evaluate_uncertainty.py --stream limb --overwrite
