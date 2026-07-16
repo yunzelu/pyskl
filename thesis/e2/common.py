@@ -25,7 +25,7 @@ CENTER_OFFSET = 30
 DEFAULT_JSONL_ROOT = Path("data/radar_v4/raw_jsonl/yolo26xpose")
 DEFAULT_CONFIG_ROOT = Path("configs/posec3d/slowonly_r50_radarv4/8111")
 DEFAULT_WORK_ROOT = Path("work_dirs/posec3d/8111")
-DEFAULT_OUTPUT_DIR = Path("thesis/e2/results")
+DEFAULT_OUTPUT_DIR = Path("work_dirs/thesis/e2")
 DEFAULT_SCORE_DIR = DEFAULT_OUTPUT_DIR / "scores"
 
 # Keep this order aligned with tools/data/radar_v4/build_pyskl_pkl.py.
