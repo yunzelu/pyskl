@@ -101,9 +101,9 @@ def fuse_rows(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Fuse E2 joint and limb score CSVs.")
-    parser.add_argument("--joint-scores", type=Path, default=DEFAULT_SCORE_DIR / "e2_joint_scores.csv")
-    parser.add_argument("--limb-scores", type=Path, default=DEFAULT_SCORE_DIR / "e2_limb_scores.csv")
-    parser.add_argument("--output", type=Path, default=DEFAULT_SCORE_DIR / "e2_fusion_joint_limb_scores.csv")
+    parser.add_argument("--joint-scores", type=Path, default=DEFAULT_SCORE_DIR / "e2_joint_logits.csv")
+    parser.add_argument("--limb-scores", type=Path, default=DEFAULT_SCORE_DIR / "e2_limb_logits.csv")
+    parser.add_argument("--output", type=Path, default=DEFAULT_SCORE_DIR / "e2_fusion_joint_limb_logits.csv")
     parser.add_argument("--joint-weight", type=float, default=1.0)
     parser.add_argument("--limb-weight", type=float, default=1.0)
     parser.add_argument("--overwrite", action="store_true")

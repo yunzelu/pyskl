@@ -176,8 +176,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--score-output",
         choices=["prob", "logit"],
-        default="prob",
-        help="Write probabilities by default; use logits for later temperature calibration.",
+        default="logit",
+        help="Write logits by default. Use prob to write post-softmax probabilities.",
     )
     parser.add_argument("--jsonl-root", type=Path, default=DEFAULT_JSONL_ROOT)
     parser.add_argument("--config-root", type=Path, default=DEFAULT_CONFIG_ROOT)
