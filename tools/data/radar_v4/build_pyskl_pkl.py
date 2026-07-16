@@ -649,21 +649,76 @@ def subjects_from_annotations(annotations: list[dict[str, Any]]) -> list[str]:
     return sorted({str(item["subject"]) for item in annotations})
 
 
+def parse_subject_args(values: list[str] | None) -> list[str] | None:
+    if values is None:
+        return None
+
+    subjects: list[str] = []
+    for value in values:
+        for subject in str(value).split(","):
+            subject = subject.strip()
+            if subject:
+                subjects.append(subject)
+
+    if not subjects:
+        return None
+
+    seen: set[str] = set()
+    duplicates: list[str] = []
+    for subject in subjects:
+        if subject in seen and subject not in duplicates:
+            duplicates.append(subject)
+        seen.add(subject)
+    if duplicates:
+        raise ValueError(f"Duplicate subject(s): {duplicates}")
+
+    return subjects
+
+
+def validate_subjects_exist(subjects: list[str] | None, available: list[str], option_name: str) -> None:
+    if subjects is None:
+        return
+
+    missing = [subject for subject in subjects if subject not in available]
+    if missing:
+        raise ValueError(
+            f"{option_name} contains unknown subject(s): {missing}. "
+            f"Available subjects: {available}"
+        )
+
+
 def make_split(
     annotations: list[dict[str, Any]],
     val_subject: str | None,
     test_subject: str | None = None,
     calibration_subject: str | None = None,
+    train_subjects: list[str] | None = None,
+    test_subjects: list[str] | None = None,
 ) -> dict[str, list[str]]:
-    held_out_subjects = [
-        subject
-        for subject in (val_subject, calibration_subject, test_subject)
-        if subject is not None
-    ]
-    if len(held_out_subjects) != len(set(held_out_subjects)):
-        raise ValueError("Validation, calibration, and test subjects must be different.")
+    if test_subject is not None and test_subjects is not None:
+        raise ValueError("Use either test_subject or test_subjects, not both.")
+
+    test_subject_list = list(test_subjects or ([] if test_subject is None else [test_subject]))
+    split_subjects = {
+        "train": set(train_subjects or []),
+        "val": set([] if val_subject is None else [val_subject]),
+        "calib": set([] if calibration_subject is None else [calibration_subject]),
+        "test": set(test_subject_list),
+    }
+
+    seen_subjects: dict[str, str] = {}
+    for split_name, subjects_for_split in split_subjects.items():
+        for subject in subjects_for_split:
+            if subject in seen_subjects:
+                raise ValueError(
+                    f"Subject {subject!r} is assigned to both "
+                    f"{seen_subjects[subject]!r} and {split_name!r}."
+                )
+            seen_subjects[subject] = split_name
 
     split = {"train": [], "val": [], "calib": [], "test": []}
+    if train_subjects is not None:
+        split["unused"] = []
 
     for item in annotations:
         subject = str(item["subject"])
@@ -671,8 +726,10 @@ def make_split(
             target = "val"
         elif calibration_subject is not None and subject == calibration_subject:
             target = "calib"
-        elif test_subject is not None and subject == test_subject:
+        elif subject in split_subjects["test"]:
             target = "test"
+        elif train_subjects is not None:
+            target = "train" if subject in split_subjects["train"] else "unused"
         else:
             target = "train"
         split[target].append(item["frame_dir"])
@@ -705,25 +762,32 @@ def make_summary(
     output_pkl: Path,
     clip_len: int,
     val_subject: str | None,
-    test_subject: str | None,
+    test_subjects: list[str] | None,
     calibration_subject: str | None = None,
+    train_subjects: list[str] | None = None,
 ) -> dict[str, Any]:
     by_split = {
         split_name: count_by_class(annotations, ids)
         for split_name, ids in split.items()
     }
+    test_subject = None
+    if test_subjects:
+        test_subject = test_subjects[0] if len(test_subjects) == 1 else test_subjects
 
     return {
         "output_pkl": str(output_pkl),
         "clip_len": clip_len,
+        "train_subjects": train_subjects,
         "val_subject": val_subject,
         "calibration_subject": calibration_subject,
         "test_subject": test_subject,
+        "test_subjects": test_subjects,
         "num_annotations": len(annotations),
         "num_train": len(split["train"]),
         "num_val": len(split["val"]),
         "num_calib": len(split.get("calib", [])),
         "num_test": len(split["test"]),
+        "num_unused": len(split.get("unused", [])),
         "label_to_id": LABEL_TO_ID,
         "samples_per_class": count_by_class(annotations),
         "samples_per_subject": count_by_subject(annotations),
@@ -754,7 +818,13 @@ def save_dataset(
     val_subject: str | None,
     test_subject: str | None = None,
     calibration_subject: str | None = None,
+    train_subjects: list[str] | None = None,
+    test_subjects: list[str] | None = None,
 ) -> None:
+    if test_subject is not None and test_subjects is not None:
+        raise ValueError("Use either test_subject or test_subjects, not both.")
+    test_subject_list = test_subjects or ([] if test_subject is None else [test_subject])
+
     output_pkl.parent.mkdir(parents=True, exist_ok=True)
     with output_pkl.open("wb") as f:
         pickle.dump(
@@ -773,8 +843,9 @@ def save_dataset(
         output_pkl=output_pkl,
         clip_len=clip_len,
         val_subject=val_subject,
-        test_subject=test_subject,
+        test_subjects=test_subject_list,
         calibration_subject=calibration_subject,
+        train_subjects=train_subjects,
     )
     summary_path = output_pkl.with_name(f"{output_pkl.stem}_summary.json")
     with summary_path.open("w", encoding="utf-8") as f:
@@ -784,7 +855,7 @@ def save_dataset(
         f"[DONE] {output_pkl} "
         f"(annotations={len(annotations)}, train={len(split['train'])}, "
         f"val={len(split['val'])}, calib={len(split.get('calib', []))}, "
-        f"test={len(split['test'])})"
+        f"test={len(split['test'])}, unused={len(split.get('unused', []))})"
     )
     print(f"[DONE] Summary: {summary_path}")
 
@@ -834,9 +905,28 @@ def parse_args() -> argparse.Namespace:
         help="Held-out subject id/name for the validation split.",
     )
     parser.add_argument(
+        "--train-subjects",
+        nargs="+",
+        default=None,
+        help=(
+            "Explicit train subject ids/names. Values may be space-separated "
+            "or comma-separated. Subjects not assigned to train/val/calib/test "
+            "are kept in an unused split."
+        ),
+    )
+    parser.add_argument(
         "--test-subject",
         default=None,
         help="Held-out subject id/name for the test split.",
+    )
+    parser.add_argument(
+        "--test-subjects",
+        nargs="+",
+        default=None,
+        help=(
+            "Held-out subject ids/names for the test split. Values may be "
+            "space-separated or comma-separated."
+        ),
     )
     parser.add_argument(
         "--calibration-subject",
@@ -884,6 +974,13 @@ def main() -> None:
     print(f"[INFO] Subjects: {subjects}")
     print(f"[INFO] Label mapping: {LABEL_TO_ID}")
 
+    train_subjects = parse_subject_args(args.train_subjects)
+    test_subjects = parse_subject_args(args.test_subjects)
+    if args.test_subject is not None and test_subjects is not None:
+        raise ValueError("Use either --test-subject or --test-subjects, not both.")
+    if args.test_subject is not None:
+        test_subjects = [args.test_subject]
+
     if args.val_subject is not None and args.val_subject not in subjects:
         raise ValueError(
             f"--val-subject {args.val_subject!r} not found. "
@@ -902,19 +999,32 @@ def main() -> None:
             f"Available subjects: {subjects}"
         )
 
-    held_out_subjects = [
-        subject
-        for subject in (args.val_subject, args.calibration_subject, args.test_subject)
-        if subject is not None
-    ]
-    if len(held_out_subjects) != len(set(held_out_subjects)):
-        raise ValueError("--val-subject, --calibration-subject, and --test-subject must be different.")
+    validate_subjects_exist(train_subjects, subjects, "--train-subjects")
+    validate_subjects_exist(test_subjects, subjects, "--test-subjects")
+
+    assigned_subjects: dict[str, str] = {}
+    subject_groups = {
+        "train": train_subjects or [],
+        "val": [] if args.val_subject is None else [args.val_subject],
+        "calib": [] if args.calibration_subject is None else [args.calibration_subject],
+        "test": test_subjects or [],
+    }
+    for split_name, split_subjects in subject_groups.items():
+        for subject in split_subjects:
+            if subject in assigned_subjects:
+                raise ValueError(
+                    f"Subject {subject!r} is assigned to both "
+                    f"{assigned_subjects[subject]!r} and {split_name!r}."
+                )
+            assigned_subjects[subject] = split_name
 
     if args.make_all_loso:
-        if args.test_subject is not None:
-            raise ValueError("--test-subject cannot be used with --make-all-loso.")
+        if test_subjects is not None:
+            raise ValueError("--test-subject/--test-subjects cannot be used with --make-all-loso.")
         if args.calibration_subject is not None:
             raise ValueError("--calibration-subject cannot be used with --make-all-loso.")
+        if train_subjects is not None:
+            raise ValueError("--train-subjects cannot be used with --make-all-loso.")
         if args.make_fixed_val_test_folds:
             raise ValueError("--make-all-loso and --make-fixed-val-test-folds are mutually exclusive.")
 
@@ -933,10 +1043,12 @@ def main() -> None:
     if args.make_fixed_val_test_folds:
         if args.val_subject is None:
             raise ValueError("--make-fixed-val-test-folds requires --val-subject.")
-        if args.test_subject is not None:
-            raise ValueError("--test-subject cannot be used with --make-fixed-val-test-folds.")
+        if test_subjects is not None:
+            raise ValueError("--test-subject/--test-subjects cannot be used with --make-fixed-val-test-folds.")
         if args.calibration_subject is not None:
             raise ValueError("--calibration-subject cannot be used with --make-fixed-val-test-folds.")
+        if train_subjects is not None:
+            raise ValueError("--train-subjects cannot be used with --make-fixed-val-test-folds.")
 
         test_subjects = [subject for subject in subjects if subject != args.val_subject]
         print(
@@ -960,23 +1072,24 @@ def main() -> None:
             )
         return
 
-    if args.test_subject is not None and args.val_subject is None:
+    if test_subjects is not None and args.val_subject is None:
         raise ValueError(
-            "--test-subject requires --val-subject so train/val/test are all explicit."
+            "--test-subject/--test-subjects requires --val-subject so train/val/test are all explicit."
         )
     if args.calibration_subject is not None and (
-        args.val_subject is None or args.test_subject is None
+        args.val_subject is None or test_subjects is None
     ):
         raise ValueError(
-            "--calibration-subject requires --val-subject and --test-subject "
+            "--calibration-subject requires --val-subject and --test-subject/--test-subjects "
             "so train/val/calib/test are all explicit."
         )
 
     split = make_split(
         annotations,
         val_subject=args.val_subject,
-        test_subject=args.test_subject,
+        test_subjects=test_subjects,
         calibration_subject=args.calibration_subject,
+        train_subjects=train_subjects,
     )
     save_dataset(
         annotations=annotations,
@@ -985,8 +1098,9 @@ def main() -> None:
         output_pkl=args.output,
         clip_len=args.clip_len,
         val_subject=args.val_subject,
-        test_subject=args.test_subject,
         calibration_subject=args.calibration_subject,
+        train_subjects=train_subjects,
+        test_subjects=test_subjects,
     )
 
 
