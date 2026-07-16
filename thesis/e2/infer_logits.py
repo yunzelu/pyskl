@@ -1,4 +1,4 @@
-"""E2 inference stage: write reusable center-window score CSV files."""
+"""E2 inference stage: write reusable center-window logit CSV files."""
 
 from __future__ import annotations
 
@@ -171,7 +171,7 @@ def infer_session_scores(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run E2 PoseC3D inference and write window scores.")
+    parser = argparse.ArgumentParser(description="Run E2 PoseC3D inference and write window logits.")
     parser.add_argument("--stream", choices=["joint", "limb"], required=True)
     parser.add_argument(
         "--score-output",
