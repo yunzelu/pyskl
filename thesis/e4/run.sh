@@ -16,7 +16,7 @@ module load StdEnv/2020 gcc/9.3.0 cuda/11.8 python/3.10 opencv/4.5.5
 source ~/projects/def-mbolic/yunzelu/pyskl/.venv/bin/activate
 cd ~/projects/def-mbolic/yunzelu/pyskl/
 
-export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
+export CUDA_VISIBLE_DEVICES=0
 
 STREAM="${STREAM:-limb}"
 LAMBDA_GRID="${LAMBDA_GRID:-0,0.02,0.05,0.1,0.2,0.3,0.5,0.75,1,1.5,2,3}"
