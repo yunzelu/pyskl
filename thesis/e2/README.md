@@ -7,13 +7,13 @@ evaluation.
 Run from the repo root:
 
 ```bash
-python thesis/e2/infer_scores.py --stream joint --overwrite
-python thesis/e2/infer_scores.py --stream limb --overwrite
-python thesis/e2/fuse_scores.py --overwrite
+python thesis/e2/infer_logits.py --stream joint --overwrite
+python thesis/e2/infer_logits.py --stream limb --overwrite
+python thesis/e2/fuse.py --overwrite
 
-python thesis/e2/evaluate_scores.py --scores work_dirs/thesis/e2/scores/e2_joint_logits.csv --overwrite
-python thesis/e2/evaluate_scores.py --scores work_dirs/thesis/e2/scores/e2_limb_logits.csv --overwrite
-python thesis/e2/evaluate_scores.py --scores work_dirs/thesis/e2/scores/e2_fusion_joint_limb_logits.csv --overwrite
+python thesis/e2/evaluate.py --scores work_dirs/thesis/e2/scores/e2_joint_logits.csv --overwrite
+python thesis/e2/evaluate.py --scores work_dirs/thesis/e2/scores/e2_limb_logits.csv --overwrite
+python thesis/e2/evaluate.py --overwrite
 ```
 
 Default protocol:
@@ -31,22 +31,22 @@ Default protocol:
 
 Score files are the boundary between components:
 
-- `infer_scores.py` creates `work_dirs/thesis/e2/scores/e2_<stream>_logits.csv` by default.
-- `fuse_scores.py` reads joint/limb score files and writes a fused score file.
-- `evaluate_scores.py` can evaluate any score file with the same schema.
+- `infer_logits.py` creates `work_dirs/thesis/e2/scores/e2_<stream>_logits.csv` by default.
+- `fuse.py` reads joint/limb score files and writes a fused score file.
+- `evaluate.py` can evaluate any score file with the same schema. By default it evaluates `e2_fusion_joint_limb_logits.csv`.
 
 Fusion defaults to joint:limb `1:1`. To change the ratio later:
 
 ```bash
-python thesis/e2/fuse_scores.py --joint-weight 2 --limb-weight 1 --output work_dirs/thesis/e2/scores/e2_fusion_j2_l1_logits.csv --overwrite
+python thesis/e2/fuse.py --joint-weight 2 --limb-weight 1 --output work_dirs/thesis/e2/scores/e2_fusion_j2_l1_logits.csv --overwrite
 ```
 
 To export probabilities instead of logits:
 
 ```bash
-python thesis/e2/infer_scores.py --stream joint --score-output prob --overwrite
-python thesis/e2/infer_scores.py --stream limb --score-output prob --overwrite
-python thesis/e2/fuse_scores.py --joint-scores work_dirs/thesis/e2/scores/e2_joint_scores.csv --limb-scores work_dirs/thesis/e2/scores/e2_limb_scores.csv --output work_dirs/thesis/e2/scores/e2_fusion_joint_limb_scores.csv --overwrite
+python thesis/e2/infer_logits.py --stream joint --score-output prob --overwrite
+python thesis/e2/infer_logits.py --stream limb --score-output prob --overwrite
+python thesis/e2/fuse.py --joint-scores work_dirs/thesis/e2/scores/e2_joint_scores.csv --limb-scores work_dirs/thesis/e2/scores/e2_limb_scores.csv --output work_dirs/thesis/e2/scores/e2_fusion_joint_limb_scores.csv --overwrite
 ```
 
 The evaluator uses argmax over the score columns, so it can evaluate either

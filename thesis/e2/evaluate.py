@@ -1,4 +1,4 @@
-"""E2 evaluation stage for any compatible center-window score CSV."""
+"""E2 evaluation stage for any compatible center-window logit/score CSV."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from typing import Any
 try:
     from .common import (
         DEFAULT_OUTPUT_DIR,
+        DEFAULT_SCORE_DIR,
         LABELS,
         ScoreRow,
         Segment,
@@ -22,6 +23,7 @@ try:
 except ImportError:
     from common import (
         DEFAULT_OUTPUT_DIR,
+        DEFAULT_SCORE_DIR,
         LABELS,
         ScoreRow,
         Segment,
@@ -403,7 +405,12 @@ def evaluate_score_file(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate an E2 window-score CSV.")
-    parser.add_argument("--scores", type=Path, required=True)
+    parser.add_argument(
+        "--scores",
+        type=Path,
+        default=DEFAULT_SCORE_DIR / "e2_fusion_joint_limb_logits.csv",
+        help="Input score/logit CSV. Default: fused joint+limb logits.",
+    )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR / "eval")
     parser.add_argument("--name", help="Output filename prefix. Default: score CSV stem.")
     parser.add_argument("--overwrite", action="store_true")

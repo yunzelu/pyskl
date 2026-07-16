@@ -1,4 +1,4 @@
-"""E2 score fusion stage for joint and limb PoseC3D streams."""
+"""E2 fusion stage for joint and limb PoseC3D streams."""
 
 from __future__ import annotations
 

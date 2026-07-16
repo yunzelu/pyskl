@@ -16,5 +16,5 @@ cd ~/projects/def-mbolic/yunzelu/pyskl/
 
 export CUDA_VISIBLE_DEVICES=0
 
-python thesis/e2/infer_scores.py --stream joint --overwrite
-python thesis/e2/infer_scores.py --stream limb  --overwrite
+python thesis/e2/infer_logits.py --stream joint --overwrite
+python thesis/e2/infer_logits.py --stream limb  --overwrite
