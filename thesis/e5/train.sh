@@ -3,7 +3,7 @@
 #SBATCH --gpus-per-node=a100:4
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=62G
-#SBATCH --time=12:00:00
+#SBATCH --time=09:00:00
 #SBATCH --job-name=e5_train
 #SBATCH --output=thesis/e5/%x_%j.out
 #SBATCH --mail-user=yunzelu@outlook.com
@@ -20,7 +20,7 @@ GPUS="${GPUS:-4}"
 SEED="${SEED:-42}"
 RUN_FOLDS="${RUN_FOLDS:-a b c}"
 RUN_TEACHERS="${RUN_TEACHERS:-t1 t2 t3 t4}"
-RUN_STREAMS="${RUN_STREAMS:-limb}"
+RUN_STREAMS="${RUN_STREAMS:-joint}"
 CONFIG_DIR="configs/posec3d/slowonly_r50_radarv4/8111teacher4"
 
 for fold in ${RUN_FOLDS}; do
