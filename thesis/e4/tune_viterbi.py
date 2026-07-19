@@ -12,7 +12,7 @@ try:
     from .common import (
         LABELS,
         apply_viterbi,
-        default_calibrated_path,
+        default_scores_path,
         default_tuning_path,
         manual_transition_matrix,
         parse_lambda_grid,
@@ -25,7 +25,7 @@ except ImportError:
     from common import (
         LABELS,
         apply_viterbi,
-        default_calibrated_path,
+        default_scores_path,
         default_tuning_path,
         manual_transition_matrix,
         parse_lambda_grid,
@@ -61,7 +61,7 @@ def metric_record(scope: str, fold: str, lam: float, rows) -> dict[str, Any]:
 
 def tune_lambda(rows, lambdas: list[float]) -> tuple[float, list[dict[str, Any]]]:
     if any(row.score_type != "prob" for row in rows):
-        raise ValueError("Viterbi tuning expects calibrated probability rows")
+        raise ValueError("Viterbi tuning expects probability rows")
 
     transition_matrix = manual_transition_matrix()
     records: list[dict[str, Any]] = []
@@ -125,6 +125,7 @@ def build_tuning_report(
     val_scores: Path,
     output: Path,
     lambdas: list[float],
+    score_kind: str,
     overwrite: bool,
 ) -> dict[str, Any]:
     rows = read_score_csv(val_scores)
@@ -141,6 +142,7 @@ def build_tuning_report(
     result = {
         "experiment": "E4",
         "stage": "viterbi_lambda_tuning",
+        "score_kind": score_kind,
         "validation_scores": str(val_scores),
         "protocol": protocol_metadata(),
         "labels": LABELS,
@@ -157,8 +159,9 @@ def build_tuning_report(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Tune E4 Viterbi lambda on calibrated validation scores.")
+    parser = argparse.ArgumentParser(description="Tune E4 Viterbi lambda on validation scores.")
     parser.add_argument("--stream", choices=["joint", "limb"], default="joint")
+    parser.add_argument("--score-kind", choices=["raw", "calibrated"], default="calibrated")
     parser.add_argument("--val-scores", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--lambda-grid", default=DEFAULT_LAMBDA_GRID)
@@ -168,12 +171,13 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    val_scores = args.val_scores or default_calibrated_path(args.stream, "val")
-    output = args.output or default_tuning_path(args.stream)
+    val_scores = args.val_scores or default_scores_path(args.stream, "val", args.score_kind)
+    output = args.output or default_tuning_path(args.stream, args.score_kind)
     result = build_tuning_report(
         val_scores=val_scores,
         output=output,
         lambdas=parse_lambda_grid(args.lambda_grid),
+        score_kind=args.score_kind,
         overwrite=args.overwrite,
     )
     metrics = result["selected_overall_metrics"]

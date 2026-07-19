@@ -1,6 +1,11 @@
 # E4: HMM/Viterbi Temporal Refinement
 
-E4 uses the same 8/1/1/1 PoseC3D checkpoints as E2/E3. It consumes E3 temperature-scaled probabilities, tunes a Viterbi smoothing strength on the validation subject, then applies the selected setting to the test subject.
+E4 uses the same 8/1/1/1 PoseC3D checkpoints as E2/E3. It evaluates Viterbi on both uncalibrated probabilities and E3-calibrated probabilities:
+
+- raw: `softmax(logits)`
+- calibrated: `softmax(logits / T)`
+- raw + Viterbi: lambda tuned on raw validation probabilities
+- calibrated + Viterbi: lambda tuned on calibrated validation probabilities
 
 Prerequisites:
 
@@ -16,14 +21,24 @@ Run E4:
 sbatch thesis/e4/run.sh
 ```
 
+The script defaults to `STREAM=limb`. To run joint later:
+
+```bash
+STREAM=joint sbatch thesis/e4/run.sh
+```
+
 Useful restricted/manual commands:
 
 ```bash
 python thesis/e4/infer_val_logits.py --stream joint --overwrite
-python thesis/e4/calibrate_scores.py --stream joint --split val --overwrite
-python thesis/e4/calibrate_scores.py --stream joint --split test --overwrite
-python thesis/e4/tune_viterbi.py --stream joint --overwrite
-python thesis/e4/apply_viterbi.py --stream joint --overwrite
+python thesis/e4/calibrate_scores.py --stream joint --split val --score-kind raw --overwrite
+python thesis/e4/calibrate_scores.py --stream joint --split test --score-kind raw --overwrite
+python thesis/e4/calibrate_scores.py --stream joint --split val --score-kind calibrated --overwrite
+python thesis/e4/calibrate_scores.py --stream joint --split test --score-kind calibrated --overwrite
+python thesis/e4/tune_viterbi.py --stream joint --score-kind raw --overwrite
+python thesis/e4/apply_viterbi.py --stream joint --score-kind raw --overwrite
+python thesis/e4/tune_viterbi.py --stream joint --score-kind calibrated --overwrite
+python thesis/e4/apply_viterbi.py --stream joint --score-kind calibrated --overwrite
 python thesis/e4/evaluate.py --stream joint --overwrite
 ```
 

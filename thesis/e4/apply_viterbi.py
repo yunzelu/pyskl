@@ -10,7 +10,7 @@ try:
     from .common import (
         LABELS,
         apply_viterbi,
-        default_calibrated_path,
+        default_scores_path,
         default_tuning_path,
         default_viterbi_path,
         manual_transition_matrix,
@@ -24,7 +24,7 @@ except ImportError:
     from common import (
         LABELS,
         apply_viterbi,
-        default_calibrated_path,
+        default_scores_path,
         default_tuning_path,
         default_viterbi_path,
         manual_transition_matrix,
@@ -50,12 +50,13 @@ def apply_to_file(
     test_scores: Path,
     tuning: Path,
     output: Path,
+    score_kind: str,
     lambda_value: float | None,
     overwrite: bool,
 ) -> None:
     rows = read_score_csv(test_scores)
     if any(row.score_type != "prob" for row in rows):
-        raise ValueError("Viterbi decoding expects calibrated probability rows")
+        raise ValueError("Viterbi decoding expects probability rows")
 
     lam = selected_lambda_from_tuning(tuning) if lambda_value is None else float(lambda_value)
     if lam < 0:
@@ -70,6 +71,7 @@ def apply_to_file(
         {
             "experiment": "E4",
             "stage": "viterbi_test_decode",
+            "score_kind": score_kind,
             "test_scores": str(test_scores),
             "tuning": str(tuning),
             "output_scores": str(output),
@@ -89,8 +91,9 @@ def apply_to_file(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Apply E4 Viterbi decoding to calibrated test scores.")
+    parser = argparse.ArgumentParser(description="Apply E4 Viterbi decoding to test scores.")
     parser.add_argument("--stream", choices=["joint", "limb"], default="joint")
+    parser.add_argument("--score-kind", choices=["raw", "calibrated"], default="calibrated")
     parser.add_argument("--test-scores", type=Path)
     parser.add_argument("--tuning", type=Path)
     parser.add_argument("--output", type=Path)
@@ -102,9 +105,10 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     apply_to_file(
-        test_scores=args.test_scores or default_calibrated_path(args.stream, "test"),
-        tuning=args.tuning or default_tuning_path(args.stream),
-        output=args.output or default_viterbi_path(args.stream),
+        test_scores=args.test_scores or default_scores_path(args.stream, "test", args.score_kind),
+        tuning=args.tuning or default_tuning_path(args.stream, args.score_kind),
+        output=args.output or default_viterbi_path(args.stream, args.score_kind),
+        score_kind=args.score_kind,
         lambda_value=args.lambda_value,
         overwrite=args.overwrite,
     )

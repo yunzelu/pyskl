@@ -12,7 +12,7 @@ try:
         DEFAULT_EVAL_DIR,
         LABELS,
         default_calibrated_path,
-        default_e3_logits_path,
+        default_raw_path,
         default_viterbi_path,
         protocol_metadata,
         read_score_csv,
@@ -23,7 +23,7 @@ except ImportError:
         DEFAULT_EVAL_DIR,
         LABELS,
         default_calibrated_path,
-        default_e3_logits_path,
+        default_raw_path,
         default_viterbi_path,
         protocol_metadata,
         read_score_csv,
@@ -80,7 +80,8 @@ def write_summary_csv(path: Path, records: list[dict[str, Any]], overwrite: bool
 def build_comparison(
     raw_scores: Path,
     calibrated_scores: Path,
-    viterbi_scores: Path,
+    raw_viterbi_scores: Path,
+    calibrated_viterbi_scores: Path,
     output_dir: Path,
     name: str,
     overwrite: bool,
@@ -88,7 +89,8 @@ def build_comparison(
     records = [
         condition_record("raw", raw_scores),
         condition_record("calibrated", calibrated_scores),
-        condition_record("calibrated_viterbi", viterbi_scores),
+        condition_record("raw_viterbi", raw_viterbi_scores),
+        condition_record("calibrated_viterbi", calibrated_viterbi_scores),
     ]
 
     csv_path = output_dir / f"{name}_summary.csv"
@@ -111,7 +113,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stream", choices=["joint", "limb"], default="joint")
     parser.add_argument("--raw-scores", type=Path)
     parser.add_argument("--calibrated-scores", type=Path)
-    parser.add_argument("--viterbi-scores", type=Path)
+    parser.add_argument("--raw-viterbi-scores", type=Path)
+    parser.add_argument("--calibrated-viterbi-scores", type=Path)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_EVAL_DIR)
     parser.add_argument("--name", default="e4_comparison")
     parser.add_argument("--overwrite", action="store_true")
@@ -121,9 +124,12 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     result = build_comparison(
-        raw_scores=args.raw_scores or default_e3_logits_path(args.stream, "test"),
+        raw_scores=args.raw_scores or default_raw_path(args.stream, "test"),
         calibrated_scores=args.calibrated_scores or default_calibrated_path(args.stream, "test"),
-        viterbi_scores=args.viterbi_scores or default_viterbi_path(args.stream),
+        raw_viterbi_scores=args.raw_viterbi_scores or default_viterbi_path(args.stream, "raw"),
+        calibrated_viterbi_scores=(
+            args.calibrated_viterbi_scores or default_viterbi_path(args.stream, "calibrated")
+        ),
         output_dir=args.output_dir,
         name=args.name,
         overwrite=args.overwrite,

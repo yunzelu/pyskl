@@ -227,18 +227,23 @@ def load_temperatures(path: Path) -> dict[str, float]:
     return output
 
 
-def calibrate_logit_rows(rows: list[ScoreRow], temperatures: dict[str, float]) -> list[ScoreRow]:
-    calibrated: list[ScoreRow] = []
+def probability_rows_from_logits(
+    rows: list[ScoreRow],
+    temperatures: dict[str, float] | None,
+    source_suffix: str,
+) -> list[ScoreRow]:
+    probability_rows: list[ScoreRow] = []
     for row in rows:
         if row.score_type != "logit":
-            raise ValueError(f"Temperature calibration requires logits, got {row.score_type!r}")
-        if row.fold not in temperatures:
+            raise ValueError(f"Probability materialization requires logits, got {row.score_type!r}")
+        if temperatures is not None and row.fold not in temperatures:
             raise ValueError(f"No temperature found for fold {row.fold}")
 
-        probabilities = softmax(row.scores.astype(np.float64) / temperatures[row.fold])
-        calibrated.append(
+        temperature = 1.0 if temperatures is None else temperatures[row.fold]
+        probabilities = softmax(row.scores.astype(np.float64) / temperature)
+        probability_rows.append(
             ScoreRow(
-                source=f"{row.source}_calibrated",
+                source=f"{row.source}_{source_suffix}",
                 score_type="prob",
                 fold=row.fold,
                 test_subject=row.test_subject,
@@ -256,7 +261,15 @@ def calibrate_logit_rows(rows: list[ScoreRow], temperatures: dict[str, float]) -
                 scores=np.asarray(probabilities, dtype=np.float32),
             )
         )
-    return calibrated
+    return probability_rows
+
+
+def raw_probability_rows(rows: list[ScoreRow]) -> list[ScoreRow]:
+    return probability_rows_from_logits(rows, temperatures=None, source_suffix="raw_softmax")
+
+
+def calibrate_logit_rows(rows: list[ScoreRow], temperatures: dict[str, float]) -> list[ScoreRow]:
+    return probability_rows_from_logits(rows, temperatures=temperatures, source_suffix="calibrated")
 
 
 def grouped_sequences(rows: list[ScoreRow]) -> list[list[ScoreRow]]:
@@ -360,12 +373,24 @@ def default_calibrated_path(stream: str, split: str) -> Path:
     return DEFAULT_SCORE_DIR / f"e4_{stream}_{split}_calibrated_probs.csv"
 
 
-def default_viterbi_path(stream: str) -> Path:
-    return DEFAULT_SCORE_DIR / f"e4_{stream}_test_calibrated_viterbi.csv"
+def default_raw_path(stream: str, split: str) -> Path:
+    return DEFAULT_SCORE_DIR / f"e4_{stream}_{split}_raw_probs.csv"
 
 
-def default_tuning_path(stream: str) -> Path:
-    return DEFAULT_TUNE_DIR / f"e4_{stream}_viterbi_tuning.json"
+def default_scores_path(stream: str, split: str, score_kind: str) -> Path:
+    if score_kind == "raw":
+        return default_raw_path(stream, split)
+    if score_kind == "calibrated":
+        return default_calibrated_path(stream, split)
+    raise ValueError(f"Unsupported score kind: {score_kind}")
+
+
+def default_viterbi_path(stream: str, score_kind: str = "calibrated") -> Path:
+    return DEFAULT_SCORE_DIR / f"e4_{stream}_test_{score_kind}_viterbi.csv"
+
+
+def default_tuning_path(stream: str, score_kind: str = "calibrated") -> Path:
+    return DEFAULT_TUNE_DIR / f"e4_{stream}_{score_kind}_viterbi_tuning.json"
 
 
 def default_e3_logits_path(stream: str, split: str) -> Path:
@@ -391,14 +416,18 @@ __all__ = [
     "default_calibrated_path",
     "default_e3_logits_path",
     "default_e3_temperature_path",
+    "default_raw_path",
+    "default_scores_path",
     "default_tuning_path",
     "default_val_logits_path",
     "default_viterbi_path",
     "load_temperatures",
     "manual_transition_matrix",
     "parse_lambda_grid",
+    "probability_rows_from_logits",
     "protocol_metadata",
     "read_score_csv",
+    "raw_probability_rows",
     "write_json",
     "write_score_csv",
     "write_transition_matrix",

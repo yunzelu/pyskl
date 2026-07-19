@@ -130,7 +130,9 @@ def build_prediction_rows(score_rows, temperatures: dict[str, float]) -> list[di
 
         temperature = temperatures[row.fold]
         features = prediction_features(row.scores.astype(np.float64), temperature)
-        boundaries = boundary_cache.setdefault(row.jsonl_path, jsonl_boundaries(row.jsonl_path))
+        if row.jsonl_path not in boundary_cache:
+            boundary_cache[row.jsonl_path] = jsonl_boundaries(row.jsonl_path)
+        boundaries = boundary_cache[row.jsonl_path]
         distance = nearest_boundary_distance(row.center_frame, boundaries)
         correct = row.valid_gt and row.gt_label == features["pred_label"]
 
