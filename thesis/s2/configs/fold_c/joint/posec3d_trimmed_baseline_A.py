@@ -105,9 +105,13 @@ test_pipeline = [
     dict(type='ToTensor', keys=['imgs'])
 ]
 
+find_unused_parameters = False
+# The shared S2 continuous-window pickle is large. Keep loader fan-out
+# conservative by default so DDP ranks/workers do not exhaust host RAM.
 data = dict(
-    videos_per_gpu=32,
-    workers_per_gpu=4,
-    test_dataloader=dict(videos_per_gpu=1),
+    videos_per_gpu=8,
+    workers_per_gpu=1,
+    persistent_workers=False,
+    test_dataloader=dict(videos_per_gpu=1, pin_memory=False),
     test=dict(type=dataset_type, ann_file=ann_file, split='test', pipeline=test_pipeline)
 )

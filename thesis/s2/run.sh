@@ -22,10 +22,17 @@ RUN_FOLDS="${RUN_FOLDS:-a}"
 RUN_STREAMS="${RUN_STREAMS:-joint}"
 RUN_METHODS="${RUN_METHODS:-A B C050}"
 RUN_EXTRA_C_ETAS="${RUN_EXTRA_C_ETAS:-0}"
+S2_VIDEOS_PER_GPU="${S2_VIDEOS_PER_GPU:-8}"
+S2_WORKERS_PER_GPU="${S2_WORKERS_PER_GPU:-1}"
 
 # python thesis/s2/stage1_report.py --overwrite
 python thesis/s2/build_continuous_windows.py --folds ${RUN_FOLDS} --overwrite
-python thesis/s2/generate_configs.py --folds ${RUN_FOLDS} --streams ${RUN_STREAMS} --overwrite
+python thesis/s2/generate_configs.py \
+  --folds ${RUN_FOLDS} \
+  --streams ${RUN_STREAMS} \
+  --videos-per-gpu "${S2_VIDEOS_PER_GPU}" \
+  --workers-per-gpu "${S2_WORKERS_PER_GPU}" \
+  --overwrite
 python thesis/s2/sanity_check.py --overwrite
 
 for stream in ${RUN_STREAMS}; do

@@ -16,6 +16,9 @@
   ],
   "total_epochs": 8,
   "lr": 0.02,
+  "videos_per_gpu": 8,
+  "workers_per_gpu": 1,
+  "test_videos_per_gpu": 1,
   "labels": [
     "Falling",
     "Lying-Stationary",

@@ -165,7 +165,20 @@ def header(method: str, fold: S2FoldSpec, stream: str, eta: float | None = None)
     )
 
 
-def baseline_config_text(fold: S2FoldSpec, stream: str) -> str:
+def dataloader_comment() -> str:
+    return (
+        "# The shared S2 continuous-window pickle is large. Keep loader fan-out\n"
+        "# conservative by default so DDP ranks/workers do not exhaust host RAM.\n"
+    )
+
+
+def baseline_config_text(
+    fold: S2FoldSpec,
+    stream: str,
+    videos_per_gpu: int,
+    workers_per_gpu: int,
+    test_videos_per_gpu: int,
+) -> str:
     stage1_ckpt = stage1_checkpoint_path(fold, stream).as_posix()
     stage1_config = stage1_config_path(fold, stream).as_posix()
     return (
@@ -181,10 +194,13 @@ def baseline_config_text(fold: S2FoldSpec, stream: str) -> str:
         + "\n"
         + PIPELINE_BLOCK.format(soft_target_stage="")
         + "\n"
+        + "find_unused_parameters = False\n"
+        + dataloader_comment()
         + "data = dict(\n"
-        + "    videos_per_gpu=32,\n"
-        + "    workers_per_gpu=4,\n"
-        + "    test_dataloader=dict(videos_per_gpu=1),\n"
+        + f"    videos_per_gpu={videos_per_gpu},\n"
+        + f"    workers_per_gpu={workers_per_gpu},\n"
+        + "    persistent_workers=False,\n"
+        + f"    test_dataloader=dict(videos_per_gpu={test_videos_per_gpu}, pin_memory=False),\n"
         + "    test=dict(type=dataset_type, ann_file=ann_file, split='test', pipeline=test_pipeline)\n"
         + ")\n"
     )
@@ -198,6 +214,9 @@ def stage2_config_text(
     eta: float | None,
     total_epochs: int,
     lr: float,
+    videos_per_gpu: int,
+    workers_per_gpu: int,
+    test_videos_per_gpu: int,
 ) -> str:
     if method not in {"B", "C"}:
         raise ValueError(method)
@@ -233,10 +252,15 @@ def stage2_config_text(
         + "class_prob = [2.0, 1.0, 2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0]\n\n"
         + PIPELINE_BLOCK.format(soft_target_stage=soft_target_stage)
         + "\n"
+        + "find_unused_parameters = False\n"
+        + dataloader_comment()
         + "data = dict(\n"
-        + "    videos_per_gpu=32,\n"
-        + "    workers_per_gpu=4,\n"
-        + "    test_dataloader=dict(videos_per_gpu=1),\n"
+        + f"    videos_per_gpu={videos_per_gpu},\n"
+        + f"    workers_per_gpu={workers_per_gpu},\n"
+        + "    persistent_workers=False,\n"
+        + "    train_dataloader=dict(pin_memory=False),\n"
+        + "    val_dataloader=dict(pin_memory=False),\n"
+        + f"    test_dataloader=dict(videos_per_gpu={test_videos_per_gpu}, pin_memory=False),\n"
         + "    train=dict(\n"
         + "        type=dataset_type,\n"
         + "        ann_file=ann_file,\n"
@@ -308,6 +332,9 @@ def generate_configs(
     etas: tuple[float, ...],
     total_epochs: int,
     lr: float,
+    videos_per_gpu: int,
+    workers_per_gpu: int,
+    test_videos_per_gpu: int,
     config_dir: Path,
     overwrite: bool,
 ) -> dict[str, list[str]]:
@@ -315,13 +342,34 @@ def generate_configs(
     for fold in folds:
         for stream in streams:
             path = generated_config_path(config_dir, "A", fold.fold, stream)
-            write_text(path, baseline_config_text(fold, stream), overwrite)
+            write_text(
+                path,
+                baseline_config_text(
+                    fold,
+                    stream,
+                    videos_per_gpu,
+                    workers_per_gpu,
+                    test_videos_per_gpu,
+                ),
+                overwrite,
+            )
             outputs["A"].append(str(path))
 
             path = generated_config_path(config_dir, "B", fold.fold, stream)
             write_text(
                 path,
-                stage2_config_text("B", fold, stream, ann_file, None, total_epochs, lr),
+                stage2_config_text(
+                    "B",
+                    fold,
+                    stream,
+                    ann_file,
+                    None,
+                    total_epochs,
+                    lr,
+                    videos_per_gpu,
+                    workers_per_gpu,
+                    test_videos_per_gpu,
+                ),
                 overwrite,
             )
             outputs["B"].append(str(path))
@@ -330,7 +378,18 @@ def generate_configs(
                 path = generated_config_path(config_dir, "C", fold.fold, stream, eta)
                 write_text(
                     path,
-                    stage2_config_text("C", fold, stream, ann_file, eta, total_epochs, lr),
+                    stage2_config_text(
+                        "C",
+                        fold,
+                        stream,
+                        ann_file,
+                        eta,
+                        total_epochs,
+                        lr,
+                        videos_per_gpu,
+                        workers_per_gpu,
+                        test_videos_per_gpu,
+                    ),
                     overwrite,
                 )
                 outputs["C"].append(str(path))
@@ -346,6 +405,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--etas", nargs="+", type=float, default=list(DEFAULT_ETAS))
     parser.add_argument("--total-epochs", type=int, default=8)
     parser.add_argument("--lr", type=float, default=0.02)
+    parser.add_argument("--videos-per-gpu", type=int, default=8)
+    parser.add_argument("--workers-per-gpu", type=int, default=1)
+    parser.add_argument("--test-videos-per-gpu", type=int, default=1)
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 
@@ -356,6 +418,12 @@ def main() -> None:
         raise ValueError("--total-epochs must be positive")
     if args.lr <= 0:
         raise ValueError("--lr must be positive")
+    if args.videos_per_gpu <= 0:
+        raise ValueError("--videos-per-gpu must be positive")
+    if args.workers_per_gpu < 0:
+        raise ValueError("--workers-per-gpu must be non-negative")
+    if args.test_videos_per_gpu <= 0:
+        raise ValueError("--test-videos-per-gpu must be positive")
 
     folds = discover_s2_folds()
     if args.folds:
@@ -372,6 +440,9 @@ def main() -> None:
         etas=tuple(args.etas),
         total_epochs=args.total_epochs,
         lr=args.lr,
+        videos_per_gpu=args.videos_per_gpu,
+        workers_per_gpu=args.workers_per_gpu,
+        test_videos_per_gpu=args.test_videos_per_gpu,
         config_dir=args.output_dir,
         overwrite=args.overwrite,
     )
@@ -385,6 +456,9 @@ def main() -> None:
             "etas": args.etas,
             "total_epochs": args.total_epochs,
             "lr": args.lr,
+            "videos_per_gpu": args.videos_per_gpu,
+            "workers_per_gpu": args.workers_per_gpu,
+            "test_videos_per_gpu": args.test_videos_per_gpu,
             "labels": LABELS,
             "configs": outputs,
         },

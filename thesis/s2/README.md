@@ -23,6 +23,12 @@ python thesis/s2/generate_configs.py --overwrite
 python thesis/s2/sanity_check.py --overwrite
 ```
 
+The generated configs default to `videos_per_gpu=8`, `workers_per_gpu=1`,
+`pin_memory=False`, and `find_unused_parameters=False`. The continuous-window
+pickle is large, so these defaults are intentionally lower than the E2
+trimmed-clip batch settings to avoid CPU RAM exhaustion when DDP ranks and
+dataloader workers replicate dataset state.
+
 Compute-saving local Method A reproduction from existing E2 scores:
 
 ```bash
@@ -67,3 +73,10 @@ python thesis/s2/evaluate_predictions.py --method B --stream fusion --overwrite
 Run `eta=0.25` and `eta=0.75` only after the `eta=0.50` soft-target run is
 worth expanding, then re-run `select_stage2_checkpoint.py --method C` with all
 three eta values.
+
+If a Slurm job is still OOM-killed, reduce loader fan-out before increasing the
+experiment scope:
+
+```bash
+S2_VIDEOS_PER_GPU=4 S2_WORKERS_PER_GPU=0 sbatch thesis/s2/run.sh
+```
