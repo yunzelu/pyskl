@@ -6,6 +6,30 @@ from ..builder import LOSSES
 from .base import BaseWeightedLoss
 
 
+def soft_cross_entropy(cls_score, target_probs, class_weight=None, tolerance=1e-4):
+    """Cross entropy for probability-distribution targets."""
+    assert cls_score.size() == target_probs.size(), (
+        f'target_probs shape {tuple(target_probs.size())} must match '
+        f'logits shape {tuple(cls_score.size())}')
+    assert cls_score.dim() == 2, 'Only support 2-dim soft label'
+    assert target_probs.dtype.is_floating_point, 'Soft labels must be floating point'
+    assert torch.isfinite(target_probs).all(), 'Soft labels contain NaN or Inf'
+    assert (target_probs >= 0).all(), 'Soft labels must be non-negative'
+    sums = target_probs.sum(dim=1)
+    assert torch.all(torch.abs(sums - 1) < tolerance), (
+        'Each soft-label row must sum to one within tolerance')
+
+    log_probs = F.log_softmax(cls_score, dim=1)
+    if class_weight is not None:
+        class_weight = class_weight.to(cls_score.device)
+        log_probs = log_probs * class_weight.unsqueeze(0)
+
+    per_sample = -(target_probs * log_probs).sum(dim=1)
+    if class_weight is not None:
+        return per_sample.sum() / torch.sum(class_weight.unsqueeze(0) * target_probs)
+    return per_sample.mean()
+
+
 @LOSSES.register_module()
 class CrossEntropyLoss(BaseWeightedLoss):
     """Cross Entropy Loss.
@@ -51,25 +75,14 @@ class CrossEntropyLoss(BaseWeightedLoss):
         if cls_score.size() == label.size():
             # calculate loss for soft label
 
-            assert cls_score.dim() == 2, 'Only support 2-dim soft label'
             assert len(kwargs) == 0, \
                 ('For now, no extra args are supported for soft label, '
                  f'but get {kwargs}')
-
-            lsm = F.log_softmax(cls_score, 1)
-            if self.class_weight is not None:
-                self.class_weight = self.class_weight.to(cls_score.device)
-                lsm = lsm * self.class_weight.unsqueeze(0)
-            loss_cls = -(label * lsm).sum(1)
-
-            # default reduction 'mean'
-            if self.class_weight is not None:
-                # Use weighted average as pytorch CrossEntropyLoss does.
-                # For more information, please visit https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html # noqa
-                loss_cls = loss_cls.sum() / torch.sum(
-                    self.class_weight.unsqueeze(0) * label)
-            else:
-                loss_cls = loss_cls.mean()
+            loss_cls = soft_cross_entropy(
+                cls_score,
+                label,
+                class_weight=self.class_weight,
+            )
         else:
             # calculate loss for hard label
 

@@ -65,18 +65,25 @@ class Rename:
             Default: dict().
     """
 
-    def __init__(self, mapping):
+    def __init__(self, mapping, allow_overwrite=False):
         self.mapping = mapping
+        self.allow_overwrite = allow_overwrite
 
     def __call__(self, results):
         for key, value in self.mapping.items():
             if key in results:
                 assert isinstance(key, str) and isinstance(value, str)
-                assert value not in results, ('the new name already exists in '
-                                              'results')
+                if not self.allow_overwrite:
+                    assert value not in results, ('the new name already exists in '
+                                                  'results')
                 results[value] = results[key]
                 results.pop(key)
         return results
+
+    def __repr__(self):
+        return (
+            f'{self.__class__.__name__}(mapping={self.mapping}, '
+            f'allow_overwrite={self.allow_overwrite})')
 
 
 @PIPELINES.register_module()

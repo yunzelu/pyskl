@@ -135,6 +135,33 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
                 class_names[label] = str(label_name)
         return class_names
 
+    @staticmethod
+    def _class_group(class_name):
+        text = str(class_name).strip().lower()
+        if 'stationary' in text or 'walk' in text:
+            return 'state'
+        if text == 'falling' or 'transition' in text:
+            return 'transition'
+        return 'other'
+
+    @staticmethod
+    def _group_macro_f1(scores, labels, class_names, group_name, num_classes):
+        pred = np.argmax(scores, axis=1).astype(np.int64)
+        _, _, f1, support = precision_recall_f1(
+            scores, labels, num_classes=num_classes)
+        predicted = np.bincount(pred, minlength=num_classes)
+        group_ids = [
+            idx for idx, name in enumerate(class_names)
+            if BaseDataset._class_group(name) == group_name
+        ]
+        active = [
+            idx for idx in group_ids
+            if int(support[idx]) > 0 or int(predicted[idx]) > 0
+        ]
+        if not active:
+            return 0.0
+        return float(np.mean(f1[active]))
+
     def evaluate(self,
                  results,
                  metrics='top_k_accuracy',
@@ -203,7 +230,8 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
         metrics = metrics if isinstance(metrics, (list, tuple)) else [metrics]
         allowed_metrics = [
             'top_k_accuracy', 'mean_class_accuracy', 'mean_average_precision',
-            'macro_f1', 'per_class_f1', 'confusion_matrix'
+            'macro_f1', 'state_macro_f1', 'transition_macro_f1',
+            'per_class_f1', 'confusion_matrix'
         ]
 
         for metric in metrics:
@@ -265,6 +293,15 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
                 macro_f1 = float(macro_f1)
                 eval_results['macro_f1'] = macro_f1
                 log_msg = f'\nmacro_f1\t{macro_f1:.4f}'
+                print_log(log_msg, logger=logger)
+                continue
+
+            if metric in {'state_macro_f1', 'transition_macro_f1'}:
+                group_name = metric.replace('_macro_f1', '')
+                group_macro_f1 = self._group_macro_f1(
+                    results, gt_labels, class_names, group_name, num_classes)
+                eval_results[metric] = group_macro_f1
+                log_msg = f'\n{metric}\t{group_macro_f1:.4f}'
                 print_log(log_msg, logger=logger)
                 continue
 

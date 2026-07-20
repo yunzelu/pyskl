@@ -1,0 +1,68 @@
+{
+  "ann_file": "data\\radar_v4\\pyskl\\s2\\radarv4_yolo26xpose_clip60_s2_continuous.pkl",
+  "folds": [
+    "a",
+    "b",
+    "c"
+  ],
+  "streams": [
+    "joint",
+    "limb"
+  ],
+  "etas": [
+    0.25,
+    0.5,
+    0.75
+  ],
+  "total_epochs": 8,
+  "lr": 0.02,
+  "labels": [
+    "Falling",
+    "Lying-Stationary",
+    "Sit-Stationary",
+    "Transition-LayBed-to-Sit",
+    "Transition-LayFloor-to-Stand",
+    "Transition-Sit-to-LayBed",
+    "Transition-Sit-to-Stand",
+    "Transition-Stand-to-Sit",
+    "Walking"
+  ],
+  "configs": {
+    "A": [
+      "thesis\\s2\\configs\\fold_a\\joint\\posec3d_trimmed_baseline_A.py",
+      "thesis\\s2\\configs\\fold_a\\limb\\posec3d_trimmed_baseline_A.py",
+      "thesis\\s2\\configs\\fold_b\\joint\\posec3d_trimmed_baseline_A.py",
+      "thesis\\s2\\configs\\fold_b\\limb\\posec3d_trimmed_baseline_A.py",
+      "thesis\\s2\\configs\\fold_c\\joint\\posec3d_trimmed_baseline_A.py",
+      "thesis\\s2\\configs\\fold_c\\limb\\posec3d_trimmed_baseline_A.py"
+    ],
+    "B": [
+      "thesis\\s2\\configs\\fold_a\\joint\\posec3d_continuous_hard_B.py",
+      "thesis\\s2\\configs\\fold_a\\limb\\posec3d_continuous_hard_B.py",
+      "thesis\\s2\\configs\\fold_b\\joint\\posec3d_continuous_hard_B.py",
+      "thesis\\s2\\configs\\fold_b\\limb\\posec3d_continuous_hard_B.py",
+      "thesis\\s2\\configs\\fold_c\\joint\\posec3d_continuous_hard_B.py",
+      "thesis\\s2\\configs\\fold_c\\limb\\posec3d_continuous_hard_B.py"
+    ],
+    "C": [
+      "thesis\\s2\\configs\\fold_a\\joint\\posec3d_continuous_soft_C_eta025.py",
+      "thesis\\s2\\configs\\fold_a\\joint\\posec3d_continuous_soft_C_eta050.py",
+      "thesis\\s2\\configs\\fold_a\\joint\\posec3d_continuous_soft_C_eta075.py",
+      "thesis\\s2\\configs\\fold_a\\limb\\posec3d_continuous_soft_C_eta025.py",
+      "thesis\\s2\\configs\\fold_a\\limb\\posec3d_continuous_soft_C_eta050.py",
+      "thesis\\s2\\configs\\fold_a\\limb\\posec3d_continuous_soft_C_eta075.py",
+      "thesis\\s2\\configs\\fold_b\\joint\\posec3d_continuous_soft_C_eta025.py",
+      "thesis\\s2\\configs\\fold_b\\joint\\posec3d_continuous_soft_C_eta050.py",
+      "thesis\\s2\\configs\\fold_b\\joint\\posec3d_continuous_soft_C_eta075.py",
+      "thesis\\s2\\configs\\fold_b\\limb\\posec3d_continuous_soft_C_eta025.py",
+      "thesis\\s2\\configs\\fold_b\\limb\\posec3d_continuous_soft_C_eta050.py",
+      "thesis\\s2\\configs\\fold_b\\limb\\posec3d_continuous_soft_C_eta075.py",
+      "thesis\\s2\\configs\\fold_c\\joint\\posec3d_continuous_soft_C_eta025.py",
+      "thesis\\s2\\configs\\fold_c\\joint\\posec3d_continuous_soft_C_eta050.py",
+      "thesis\\s2\\configs\\fold_c\\joint\\posec3d_continuous_soft_C_eta075.py",
+      "thesis\\s2\\configs\\fold_c\\limb\\posec3d_continuous_soft_C_eta025.py",
+      "thesis\\s2\\configs\\fold_c\\limb\\posec3d_continuous_soft_C_eta050.py",
+      "thesis\\s2\\configs\\fold_c\\limb\\posec3d_continuous_soft_C_eta075.py"
+    ]
+  }
+}

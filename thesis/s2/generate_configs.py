@@ -1,0 +1,398 @@
+"""Generate Study 2 PoseC3D configs from the existing E2 fold split."""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+try:
+    from .common import (
+        DEFAULT_CONFIG_DIR,
+        DEFAULT_ETAS,
+        DEFAULT_S2_PKL,
+        LABELS,
+        S2FoldSpec,
+        discover_s2_folds,
+        eta_slug,
+        stage1_checkpoint_path,
+        stage1_config_path,
+        stage2_work_dir,
+        write_json,
+    )
+except ImportError:
+    from common import (
+        DEFAULT_CONFIG_DIR,
+        DEFAULT_ETAS,
+        DEFAULT_S2_PKL,
+        LABELS,
+        S2FoldSpec,
+        discover_s2_folds,
+        eta_slug,
+        stage1_checkpoint_path,
+        stage1_config_path,
+        stage2_work_dir,
+        write_json,
+    )
+
+
+SKELETON_BLOCK = """# COCO-17 left/right keypoint ids
+left_kp = [1, 3, 5, 7, 9, 11, 13, 15]
+right_kp = [2, 4, 6, 8, 10, 12, 14, 16]
+skeletons = [[0, 5], [0, 6], [5, 7], [7, 9], [6, 8], [8, 10], [5, 11],
+             [11, 13], [13, 15], [6, 12], [12, 14], [14, 16], [0, 1], [0, 2],
+             [1, 3], [2, 4], [11, 12]]
+left_limb = [0, 2, 3, 6, 7, 8, 12, 14]
+right_limb = [1, 4, 5, 9, 10, 11, 13, 15]
+"""
+
+
+MODEL_BLOCK = """model = dict(
+    type='Recognizer3D',
+    backbone=dict(
+        type='ResNet3dSlowOnly',
+        in_channels=17,
+        base_channels=32,
+        num_stages=3,
+        out_indices=(2, ),
+        stage_blocks=(4, 6, 3),
+        conv1_stride=(1, 1),
+        pool1_stride=(1, 1),
+        inflate=(0, 1, 1),
+        spatial_strides=(2, 2, 2),
+        temporal_strides=(1, 1, 2)
+    ),
+    cls_head=dict(
+        type='I3DHead',
+        in_channels=512,
+        num_classes=9,
+        dropout=0.5,
+        loss_cls=dict(type='CrossEntropyLoss')
+    ),
+    test_cfg=dict(average_clips='prob')
+)
+"""
+
+
+PIPELINE_BLOCK = """generate_pose_target = dict(
+    joint=dict(with_kp=True, with_limb=False),
+    limb=dict(with_kp=False, with_limb=True, skeletons=skeletons)
+)[stream]
+
+generate_pose_target_test = dict(
+    joint=dict(
+        with_kp=True,
+        with_limb=False,
+        double=True,
+        left_kp=left_kp,
+        right_kp=right_kp
+    ),
+    limb=dict(
+        with_kp=False,
+        with_limb=True,
+        skeletons=skeletons,
+        double=True,
+        left_kp=left_kp,
+        right_kp=right_kp,
+        left_limb=left_limb,
+        right_limb=right_limb
+    )
+)[stream]
+
+train_pipeline = [
+    dict(type='UniformSampleFrames', clip_len=60),
+    dict(type='PoseDecode'),
+    dict(type='PoseCompact', hw_ratio=1., allow_imgpad=True),
+    dict(type='Resize', scale=(-1, 64)),
+    dict(type='RandomResizedCrop', area_range=(0.56, 1.0)),
+    dict(type='Resize', scale=(56, 56), keep_ratio=False),
+    dict(type='Flip', flip_ratio=0.5, left_kp=left_kp, right_kp=right_kp),
+    dict(type='GeneratePoseTarget', **generate_pose_target),
+    dict(type='FormatShape', input_format='NCTHW_Heatmap'),
+{soft_target_stage}    dict(type='Collect', keys=['imgs', 'label'], meta_keys=[]),
+    dict(type='ToTensor', keys=['imgs', 'label'])
+]
+
+val_pipeline = [
+    dict(type='UniformSampleFrames', clip_len=60, num_clips=1),
+    dict(type='PoseDecode'),
+    dict(type='PoseCompact', hw_ratio=1., allow_imgpad=True),
+    dict(type='Resize', scale=(64, 64), keep_ratio=False),
+    dict(type='GeneratePoseTarget', **generate_pose_target),
+    dict(type='FormatShape', input_format='NCTHW_Heatmap'),
+    dict(type='Collect', keys=['imgs', 'label'], meta_keys=[]),
+    dict(type='ToTensor', keys=['imgs'])
+]
+
+test_pipeline = [
+    dict(type='UniformSampleFrames', clip_len=60, num_clips=1),
+    dict(type='PoseDecode'),
+    dict(type='PoseCompact', hw_ratio=1., allow_imgpad=True),
+    dict(type='Resize', scale=(64, 64), keep_ratio=False),
+    dict(type='GeneratePoseTarget', **generate_pose_target_test),
+    dict(type='FormatShape', input_format='NCTHW_Heatmap'),
+    dict(type='Collect', keys=['imgs', 'label'], meta_keys=[]),
+    dict(type='ToTensor', keys=['imgs'])
+]
+"""
+
+
+def fold_comment(fold: S2FoldSpec) -> str:
+    return "\n".join(
+        [
+            "# Reused E2 subject split:",
+            f"# Train subjects: {', '.join(fold.train_subjects)}",
+            f"# Validation subject: {fold.val_subject}",
+            f"# Calibration subject: {fold.calibration_subject or ''} (unused in S2)",
+            f"# Test subject: {fold.test_subject}",
+        ]
+    )
+
+
+def header(method: str, fold: S2FoldSpec, stream: str, eta: float | None = None) -> str:
+    title = {
+        "A": "Method A: trimmed-only teacher, inference only",
+        "B": "Method B: continuous hard center-time fine-tuning",
+        "C": "Method C: continuous center-weighted soft-target fine-tuning",
+    }[method]
+    eta_line = "" if eta is None else f"# eta: {eta:.2f}\n"
+    return (
+        "# ============================================================\n"
+        f"# Study 2 {title}\n"
+        f"# Fold {fold.fold}, stream {stream}\n"
+        f"{eta_line}"
+        "# Generated by thesis/s2/generate_configs.py\n"
+        "# ============================================================\n\n"
+    )
+
+
+def baseline_config_text(fold: S2FoldSpec, stream: str) -> str:
+    stage1_ckpt = stage1_checkpoint_path(fold, stream).as_posix()
+    stage1_config = stage1_config_path(fold, stream).as_posix()
+    return (
+        header("A", fold, stream)
+        + f"stream = {stream!r}\n"
+        + f"stage1_config = {stage1_config!r}\n"
+        + f"stage1_checkpoint = {stage1_ckpt!r}\n"
+        + f"ann_file = {fold.stage1_pkl_path.as_posix()!r}\n"
+        + "dataset_type = 'PoseDataset'\n\n"
+        + MODEL_BLOCK
+        + "\n"
+        + SKELETON_BLOCK
+        + "\n"
+        + PIPELINE_BLOCK.format(soft_target_stage="")
+        + "\n"
+        + "data = dict(\n"
+        + "    videos_per_gpu=32,\n"
+        + "    workers_per_gpu=4,\n"
+        + "    test_dataloader=dict(videos_per_gpu=1),\n"
+        + "    test=dict(type=dataset_type, ann_file=ann_file, split='test', pipeline=test_pipeline)\n"
+        + ")\n"
+    )
+
+
+def stage2_config_text(
+    method: str,
+    fold: S2FoldSpec,
+    stream: str,
+    ann_file: Path,
+    eta: float | None,
+    total_epochs: int,
+    lr: float,
+) -> str:
+    if method not in {"B", "C"}:
+        raise ValueError(method)
+    if method == "C" and eta is None:
+        raise ValueError("Method C requires eta")
+
+    if method == "C":
+        target_key = f"target_probs_{eta_slug(float(eta))}"
+        soft_target_stage = (
+            f"    dict(type='Rename', mapping={{'{target_key}': 'label'}}, allow_overwrite=True),\n"
+        )
+        work_dir = stage2_work_dir(method, fold.fold, stream, eta)
+    else:
+        soft_target_stage = ""
+        work_dir = stage2_work_dir(method, fold.fold, stream)
+
+    stage1_ckpt = stage1_checkpoint_path(fold, stream).as_posix()
+    return (
+        header(method, fold, stream, eta=eta)
+        + f"stream = {stream!r}\n"
+        + f"ann_file = {ann_file.as_posix()!r}\n"
+        + "dataset_type = 'PoseDataset'\n\n"
+        + MODEL_BLOCK
+        + "\n"
+        + SKELETON_BLOCK
+        + "\n"
+        + fold_comment(fold)
+        + "\n"
+        + "# Continuous-window split keys are stored in the shared S2 pkl.\n"
+        + f"train_split = {fold.split_key('train')!r}\n"
+        + f"val_split = {fold.split_key('val')!r}\n"
+        + f"test_split = {fold.split_key('test')!r}\n"
+        + "class_prob = [2.0, 1.0, 2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0]\n\n"
+        + PIPELINE_BLOCK.format(soft_target_stage=soft_target_stage)
+        + "\n"
+        + "data = dict(\n"
+        + "    videos_per_gpu=32,\n"
+        + "    workers_per_gpu=4,\n"
+        + "    test_dataloader=dict(videos_per_gpu=1),\n"
+        + "    train=dict(\n"
+        + "        type=dataset_type,\n"
+        + "        ann_file=ann_file,\n"
+        + "        pipeline=train_pipeline,\n"
+        + "        split=train_split,\n"
+        + "        class_prob=class_prob\n"
+        + "    ),\n"
+        + "    val=dict(type=dataset_type, ann_file=ann_file, split=val_split, pipeline=val_pipeline),\n"
+        + "    test=dict(type=dataset_type, ann_file=ann_file, split=test_split, pipeline=test_pipeline)\n"
+        + ")\n\n"
+        + "optimizer = dict(type='SGD', lr="
+        + f"{lr:g}, momentum=0.9, weight_decay=0.0003)\n"
+        + "optimizer_config = dict(grad_clip=dict(max_norm=40, norm_type=2))\n"
+        + "lr_config = dict(policy='CosineAnnealing', by_epoch=False, min_lr=0)\n"
+        + f"total_epochs = {total_epochs}\n"
+        + "checkpoint_config = dict(interval=1)\n"
+        + "evaluation = dict(\n"
+        + "    interval=1,\n"
+        + "    metrics=['top_k_accuracy', 'mean_class_accuracy', 'macro_f1', 'state_macro_f1', 'transition_macro_f1'],\n"
+        + "    topk=(1, 5),\n"
+        + "    save_best='macro_f1',\n"
+        + "    rule='greater'\n"
+        + ")\n"
+        + "test_evaluation = dict(\n"
+        + "    metrics=['top_k_accuracy', 'mean_class_accuracy', 'macro_f1', 'state_macro_f1',\n"
+        + "             'transition_macro_f1', 'per_class_f1', 'confusion_matrix'],\n"
+        + "    topk=(1, 5)\n"
+        + ")\n"
+        + "log_config = dict(interval=20, hooks=[dict(type='TextLoggerHook')])\n"
+        + "log_level = 'INFO'\n"
+        + f"load_from = {stage1_ckpt!r}\n"
+        + "resume_from = None\n"
+        + "auto_resume = False\n"
+        + f"work_dir = './{work_dir.as_posix()}'\n"
+    )
+
+
+def write_text(path: Path, text: str, overwrite: bool) -> None:
+    if path.exists() and not overwrite:
+        raise FileExistsError(f"{path} exists; pass --overwrite to replace it")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def generated_config_path(
+    config_dir: Path,
+    method: str,
+    fold: str,
+    stream: str,
+    eta: float | None = None,
+) -> Path:
+    if method == "A":
+        filename = "posec3d_trimmed_baseline_A.py"
+    elif method == "B":
+        filename = "posec3d_continuous_hard_B.py"
+    elif method == "C":
+        if eta is None:
+            raise ValueError("Method C requires eta")
+        filename = f"posec3d_continuous_soft_C_{eta_slug(eta)}.py"
+    else:
+        raise ValueError(method)
+    return config_dir / f"fold_{fold}" / stream / filename
+
+
+def generate_configs(
+    folds: list[S2FoldSpec],
+    streams: list[str],
+    ann_file: Path,
+    etas: tuple[float, ...],
+    total_epochs: int,
+    lr: float,
+    config_dir: Path,
+    overwrite: bool,
+) -> dict[str, list[str]]:
+    outputs: dict[str, list[str]] = {"A": [], "B": [], "C": []}
+    for fold in folds:
+        for stream in streams:
+            path = generated_config_path(config_dir, "A", fold.fold, stream)
+            write_text(path, baseline_config_text(fold, stream), overwrite)
+            outputs["A"].append(str(path))
+
+            path = generated_config_path(config_dir, "B", fold.fold, stream)
+            write_text(
+                path,
+                stage2_config_text("B", fold, stream, ann_file, None, total_epochs, lr),
+                overwrite,
+            )
+            outputs["B"].append(str(path))
+
+            for eta in etas:
+                path = generated_config_path(config_dir, "C", fold.fold, stream, eta)
+                write_text(
+                    path,
+                    stage2_config_text("C", fold, stream, ann_file, eta, total_epochs, lr),
+                    overwrite,
+                )
+                outputs["C"].append(str(path))
+    return outputs
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Generate Study 2 PoseC3D configs.")
+    parser.add_argument("--output-dir", type=Path, default=DEFAULT_CONFIG_DIR)
+    parser.add_argument("--ann-file", type=Path, default=DEFAULT_S2_PKL)
+    parser.add_argument("--folds", nargs="+", help="Fold ids to include. Default: all.")
+    parser.add_argument("--streams", nargs="+", choices=["joint", "limb"], default=["joint", "limb"])
+    parser.add_argument("--etas", nargs="+", type=float, default=list(DEFAULT_ETAS))
+    parser.add_argument("--total-epochs", type=int, default=8)
+    parser.add_argument("--lr", type=float, default=0.02)
+    parser.add_argument("--overwrite", action="store_true")
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    if args.total_epochs <= 0:
+        raise ValueError("--total-epochs must be positive")
+    if args.lr <= 0:
+        raise ValueError("--lr must be positive")
+
+    folds = discover_s2_folds()
+    if args.folds:
+        requested = {item.lower().replace("fold_", "") for item in args.folds}
+        folds = [fold for fold in folds if fold.fold in requested]
+        missing = sorted(requested - {fold.fold for fold in folds})
+        if missing:
+            raise ValueError(f"Unknown fold(s): {missing}")
+
+    outputs = generate_configs(
+        folds=folds,
+        streams=args.streams,
+        ann_file=args.ann_file,
+        etas=tuple(args.etas),
+        total_epochs=args.total_epochs,
+        lr=args.lr,
+        config_dir=args.output_dir,
+        overwrite=args.overwrite,
+    )
+    summary_path = args.output_dir / "config_manifest.json"
+    write_json(
+        summary_path,
+        {
+            "ann_file": str(args.ann_file),
+            "folds": [fold.fold for fold in folds],
+            "streams": args.streams,
+            "etas": args.etas,
+            "total_epochs": args.total_epochs,
+            "lr": args.lr,
+            "labels": LABELS,
+            "configs": outputs,
+        },
+        overwrite=args.overwrite,
+    )
+    print(f"[DONE] wrote S2 configs under {args.output_dir}")
+    print(f"[DONE] config manifest: {summary_path}")
+
+
+if __name__ == "__main__":
+    main()
