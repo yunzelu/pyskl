@@ -20,6 +20,7 @@ Prepare S2 artifacts:
 python thesis/s2/stage1_report.py --overwrite
 python thesis/s2/build_continuous_windows.py --overwrite
 python thesis/s2/generate_configs.py --overwrite
+python thesis/s2/class_balance.py --overwrite
 python thesis/s2/sanity_check.py --overwrite
 ```
 
@@ -28,6 +29,11 @@ The generated configs default to `videos_per_gpu=8`, `workers_per_gpu=1`,
 pickle is large, so these defaults are intentionally lower than the E2
 trimmed-clip batch settings to avoid CPU RAM exhaustion when DDP ranks and
 dataloader workers replicate dataset state.
+
+Stage-2 configs default to `--class-prob-strategy train_inverse_mean` with
+`--class-prob-cap 4.0`. This computes sampler multipliers from each fold's
+continuous training windows only. Use `--class-prob-strategy stage1` to reproduce
+the older trimmed-stage heuristic `[2, 1, 2, 2, 2, 2, 1, 1, 1]`.
 
 Compute-saving local Method A reproduction from existing E2 scores:
 

@@ -24,6 +24,8 @@ RUN_METHODS="${RUN_METHODS:-A B C050}"
 RUN_EXTRA_C_ETAS="${RUN_EXTRA_C_ETAS:-0}"
 S2_VIDEOS_PER_GPU="${S2_VIDEOS_PER_GPU:-8}"
 S2_WORKERS_PER_GPU="${S2_WORKERS_PER_GPU:-1}"
+S2_CLASS_PROB_STRATEGY="${S2_CLASS_PROB_STRATEGY:-train_inverse_mean}"
+S2_CLASS_PROB_CAP="${S2_CLASS_PROB_CAP:-4.0}"
 
 # python thesis/s2/stage1_report.py --overwrite
 python thesis/s2/build_continuous_windows.py --folds ${RUN_FOLDS} --overwrite
@@ -32,6 +34,13 @@ python thesis/s2/generate_configs.py \
   --streams ${RUN_STREAMS} \
   --videos-per-gpu "${S2_VIDEOS_PER_GPU}" \
   --workers-per-gpu "${S2_WORKERS_PER_GPU}" \
+  --class-prob-strategy "${S2_CLASS_PROB_STRATEGY}" \
+  --class-prob-cap "${S2_CLASS_PROB_CAP}" \
+  --overwrite
+python thesis/s2/class_balance.py \
+  --folds ${RUN_FOLDS} \
+  --cap "${S2_CLASS_PROB_CAP}" \
+  --strategies stage1 train_inverse_mean train_sqrt_inverse_mean none \
   --overwrite
 python thesis/s2/sanity_check.py --overwrite
 

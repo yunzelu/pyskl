@@ -52,7 +52,19 @@ right_limb = [1, 4, 5, 9, 10, 11, 13, 15]
 train_split = 'fold_c_train'
 val_split = 'fold_c_val'
 test_split = 'fold_c_test'
-class_prob = [2.0, 1.0, 2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0]
+# Stage-2 class_prob is computed from this fold's continuous training windows only.
+# class_prob strategy: train_inverse_mean; cap: 4
+# Train window counts:
+# Falling: 1678
+# Lying-Stationary: 10982
+# Sit-Stationary: 4881
+# Transition-LayBed-to-Sit: 2190
+# Transition-LayFloor-to-Stand: 4739
+# Transition-Sit-to-LayBed: 1804
+# Transition-Sit-to-Stand: 1783
+# Transition-Stand-to-Sit: 2049
+# Walking: 25932
+class_prob = [3.71063, 1, 1.27565, 2.84313, 1.31387, 3.45147, 3.49212, 3.03877, 1]
 
 generate_pose_target = dict(
     joint=dict(with_kp=True, with_limb=False),

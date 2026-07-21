@@ -6,6 +6,12 @@ import argparse
 from pathlib import Path
 
 try:
+    from .class_balance import (
+        CLASS_PROB_STRATEGIES,
+        compute_class_prob,
+        format_prob,
+        train_label_counts_by_fold,
+    )
     from .common import (
         DEFAULT_CONFIG_DIR,
         DEFAULT_ETAS,
@@ -20,6 +26,12 @@ try:
         write_json,
     )
 except ImportError:
+    from class_balance import (
+        CLASS_PROB_STRATEGIES,
+        compute_class_prob,
+        format_prob,
+        train_label_counts_by_fold,
+    )
     from common import (
         DEFAULT_CONFIG_DIR,
         DEFAULT_ETAS,
@@ -148,6 +160,21 @@ def fold_comment(fold: S2FoldSpec) -> str:
     )
 
 
+def class_balance_comment(
+    counts: list[int],
+    strategy: str,
+    cap: float,
+) -> str:
+    lines = [
+        "# Stage-2 class_prob is computed from this fold's continuous training windows only.",
+        f"# class_prob strategy: {strategy}; cap: {cap:g}",
+        "# Train window counts:",
+    ]
+    for label, count in zip(LABELS, counts):
+        lines.append(f"# {label}: {int(count)}")
+    return "\n".join(lines) + "\n"
+
+
 def header(method: str, fold: S2FoldSpec, stream: str, eta: float | None = None) -> str:
     title = {
         "A": "Method A: trimmed-only teacher, inference only",
@@ -217,6 +244,10 @@ def stage2_config_text(
     videos_per_gpu: int,
     workers_per_gpu: int,
     test_videos_per_gpu: int,
+    class_prob: list[float],
+    class_counts: list[int],
+    class_prob_strategy: str,
+    class_prob_cap: float,
 ) -> str:
     if method not in {"B", "C"}:
         raise ValueError(method)
@@ -249,7 +280,8 @@ def stage2_config_text(
         + f"train_split = {fold.split_key('train')!r}\n"
         + f"val_split = {fold.split_key('val')!r}\n"
         + f"test_split = {fold.split_key('test')!r}\n"
-        + "class_prob = [2.0, 1.0, 2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0]\n\n"
+        + class_balance_comment(class_counts, class_prob_strategy, class_prob_cap)
+        + f"class_prob = {format_prob(class_prob)}\n\n"
         + PIPELINE_BLOCK.format(soft_target_stage=soft_target_stage)
         + "\n"
         + "find_unused_parameters = False\n"
@@ -335,6 +367,10 @@ def generate_configs(
     videos_per_gpu: int,
     workers_per_gpu: int,
     test_videos_per_gpu: int,
+    class_probs_by_fold: dict[str, list[float]],
+    class_counts_by_fold: dict[str, list[int]],
+    class_prob_strategy: str,
+    class_prob_cap: float,
     config_dir: Path,
     overwrite: bool,
 ) -> dict[str, list[str]]:
@@ -369,6 +405,10 @@ def generate_configs(
                     videos_per_gpu,
                     workers_per_gpu,
                     test_videos_per_gpu,
+                    class_probs_by_fold[fold.fold],
+                    class_counts_by_fold[fold.fold],
+                    class_prob_strategy,
+                    class_prob_cap,
                 ),
                 overwrite,
             )
@@ -389,6 +429,10 @@ def generate_configs(
                         videos_per_gpu,
                         workers_per_gpu,
                         test_videos_per_gpu,
+                        class_probs_by_fold[fold.fold],
+                        class_counts_by_fold[fold.fold],
+                        class_prob_strategy,
+                        class_prob_cap,
                     ),
                     overwrite,
                 )
@@ -408,6 +452,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--videos-per-gpu", type=int, default=8)
     parser.add_argument("--workers-per-gpu", type=int, default=1)
     parser.add_argument("--test-videos-per-gpu", type=int, default=1)
+    parser.add_argument(
+        "--class-prob-strategy",
+        choices=CLASS_PROB_STRATEGIES,
+        default="train_inverse_mean",
+        help=(
+            "Sampler multipliers for Stage-2 training. The default computes "
+            "fold-specific capped inverse-frequency multipliers from the "
+            "continuous training split only."
+        ),
+    )
+    parser.add_argument("--class-prob-cap", type=float, default=4.0)
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 
@@ -424,6 +479,8 @@ def main() -> None:
         raise ValueError("--workers-per-gpu must be non-negative")
     if args.test_videos_per_gpu <= 0:
         raise ValueError("--test-videos-per-gpu must be positive")
+    if args.class_prob_cap < 1:
+        raise ValueError("--class-prob-cap must be >= 1")
 
     folds = discover_s2_folds()
     if args.folds:
@@ -432,6 +489,16 @@ def main() -> None:
         missing = sorted(requested - {fold.fold for fold in folds})
         if missing:
             raise ValueError(f"Unknown fold(s): {missing}")
+
+    class_counts_by_fold = train_label_counts_by_fold(args.ann_file, folds)
+    class_probs_by_fold = {
+        fold.fold: compute_class_prob(
+            class_counts_by_fold[fold.fold],
+            args.class_prob_strategy,
+            args.class_prob_cap,
+        )
+        for fold in folds
+    }
 
     outputs = generate_configs(
         folds=folds,
@@ -443,6 +510,10 @@ def main() -> None:
         videos_per_gpu=args.videos_per_gpu,
         workers_per_gpu=args.workers_per_gpu,
         test_videos_per_gpu=args.test_videos_per_gpu,
+        class_probs_by_fold=class_probs_by_fold,
+        class_counts_by_fold=class_counts_by_fold,
+        class_prob_strategy=args.class_prob_strategy,
+        class_prob_cap=args.class_prob_cap,
         config_dir=args.output_dir,
         overwrite=args.overwrite,
     )
@@ -459,6 +530,10 @@ def main() -> None:
             "videos_per_gpu": args.videos_per_gpu,
             "workers_per_gpu": args.workers_per_gpu,
             "test_videos_per_gpu": args.test_videos_per_gpu,
+            "class_prob_strategy": args.class_prob_strategy,
+            "class_prob_cap": args.class_prob_cap,
+            "class_counts_by_fold": class_counts_by_fold,
+            "class_probs_by_fold": class_probs_by_fold,
             "labels": LABELS,
             "configs": outputs,
         },
