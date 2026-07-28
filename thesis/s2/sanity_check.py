@@ -24,6 +24,7 @@ try:
         eta_slug,
         protocol_metadata,
         read_json,
+        s2_config_path,
         write_json,
     )
 except ImportError:
@@ -40,6 +41,7 @@ except ImportError:
         eta_slug,
         protocol_metadata,
         read_json,
+        s2_config_path,
         write_json,
     )
 
@@ -207,6 +209,82 @@ def check_eta_zero_loss() -> dict[str, Any]:
         )
 
 
+def filter_folds(fold_args: list[str] | None):
+    folds = discover_s2_folds()
+    if not fold_args:
+        return folds
+    requested = {item.lower().replace("fold_", "") for item in fold_args}
+    folds = [fold for fold in folds if fold.fold in requested]
+    missing = sorted(requested - {fold.fold for fold in folds})
+    if missing:
+        raise ValueError(f"Unknown fold(s): {missing}")
+    return folds
+
+
+def check_stage2_sampling_configs(
+    folds,
+    streams: list[str],
+    etas: tuple[float, ...],
+    expected_strategy: str,
+    expected_power: float,
+) -> dict[str, Any]:
+    failures = []
+    checked = []
+    for fold in folds:
+        for stream in streams:
+            paths = [s2_config_path("B", fold.fold, stream)]
+            paths.extend(s2_config_path("C", fold.fold, stream, eta) for eta in etas)
+            for path in paths:
+                record = {"path": str(path), "fold": fold.fold, "stream": stream}
+                if not path.exists():
+                    failures.append({**record, "reason": "missing_config"})
+                    continue
+                text = path.read_text(encoding="utf-8")
+                checked.append(str(path))
+                if "class_prob" in text:
+                    failures.append({**record, "reason": "uses_legacy_class_prob"})
+                if expected_strategy == "none":
+                    if "class_sample_strategy" in text or "class_sample_power" in text:
+                        failures.append({**record, "reason": "unexpected_class_sample_strategy"})
+                    continue
+                expected_strategy_line = f"class_sample_strategy = {expected_strategy!r}"
+                if expected_strategy_line not in text:
+                    failures.append(
+                        {
+                            **record,
+                            "reason": "missing_or_wrong_class_sample_strategy",
+                            "expected": expected_strategy_line,
+                        }
+                    )
+                expected_power_line = f"class_sample_power = {expected_power:.12g}"
+                if expected_power_line not in text:
+                    failures.append(
+                        {
+                            **record,
+                            "reason": "missing_or_wrong_class_sample_power",
+                            "expected": expected_power_line,
+                        }
+                    )
+                if "epoch_size =" not in text:
+                    failures.append({**record, "reason": "missing_epoch_size"})
+                if "class_sample_strategy=class_sample_strategy" not in text:
+                    failures.append({**record, "reason": "train_dataset_missing_strategy_kwarg"})
+                if "class_sample_power=class_sample_power" not in text:
+                    failures.append({**record, "reason": "train_dataset_missing_power_kwarg"})
+                if "epoch_size=epoch_size" not in text:
+                    failures.append({**record, "reason": "train_dataset_missing_epoch_size_kwarg"})
+    return assert_or_record(
+        not failures,
+        "Stage-2 configs use epoch-wise class sampling, not class_prob",
+        {
+            "checked_configs": checked,
+            "expected_strategy": expected_strategy,
+            "expected_power": expected_power,
+            "failures": failures[:20],
+        },
+    )
+
+
 def prediction_keys(path: Path) -> set[tuple[str, str, int, int, int]]:
     keys = set()
     with path.open(newline="", encoding="utf-8-sig") as handle:
@@ -243,7 +321,32 @@ def check_prediction_alignment(stream: str) -> dict[str, Any]:
     return assert_or_record(ok, "A/B/C methods use exactly the same test windows", details)
 
 
-def check_e2_reproduction(stream: str, s2_metrics: Path, e2_summary: Path, tolerance: float) -> dict[str, Any]:
+def recording_scope_for_pkl(path: Path) -> str | None:
+    summary_path = path.with_name(f"{path.stem}_summary.json")
+    if summary_path.exists():
+        return str(read_json(summary_path).get("recording_scope") or "")
+    if path.exists():
+        data = load_pkl(path)
+        protocol = data.get("protocol", {}) if isinstance(data, dict) else {}
+        return str(protocol.get("default_recording_scope") or "")
+    return None
+
+
+def check_e2_reproduction(
+    stream: str,
+    s2_metrics: Path,
+    e2_summary: Path,
+    tolerance: float,
+    recording_scope: str | None,
+) -> dict[str, Any]:
+    if recording_scope and "non-walk" not in recording_scope.lower():
+        return skip_record(
+            "Baseline A reproduces E2 center metrics",
+            (
+                f"S2 recording_scope={recording_scope!r}; the E2 reference "
+                "is only comparable for the older non-walk evaluation scope"
+            ),
+        )
     if not s2_metrics.exists():
         return skip_record("Baseline A reproduces E2 center metrics", f"missing {s2_metrics}")
     if not e2_summary.exists():
@@ -273,8 +376,16 @@ def check_e2_reproduction(stream: str, s2_metrics: Path, e2_summary: Path, toler
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run S2 sanity checks.")
     parser.add_argument("--pkl", type=Path, default=DEFAULT_S2_PKL)
+    parser.add_argument("--folds", nargs="+", help="Fold ids to include for config checks. Default: all.")
+    parser.add_argument("--streams", nargs="+", choices=["joint", "limb"], default=["joint"])
     parser.add_argument("--etas", nargs="+", type=float, default=list(DEFAULT_ETAS))
     parser.add_argument("--stream", choices=["joint", "limb"], default="joint")
+    parser.add_argument(
+        "--expected-class-sample-strategy",
+        choices=["sqrt", "power", "none"],
+        default="sqrt",
+    )
+    parser.add_argument("--expected-class-sample-power", type=float, default=0.5)
     parser.add_argument("--s2-a-metrics", type=Path, default=DEFAULT_OUTPUT_DIR / "eval" / "metrics_A.json")
     parser.add_argument(
         "--e2-summary",
@@ -289,11 +400,30 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    folds = filter_folds(args.folds)
+    recording_scope = recording_scope_for_pkl(args.pkl)
     checks = [check_subject_splits()]
     checks.extend(check_pkl_windows(args.pkl, tuple(args.etas)))
+    checks.append(
+        check_stage2_sampling_configs(
+            folds=folds,
+            streams=args.streams,
+            etas=tuple(args.etas),
+            expected_strategy=args.expected_class_sample_strategy,
+            expected_power=args.expected_class_sample_power,
+        )
+    )
     checks.append(check_eta_zero_loss())
     checks.append(check_prediction_alignment(args.stream))
-    checks.append(check_e2_reproduction(args.stream, args.s2_a_metrics, args.e2_summary, args.e2_tolerance))
+    checks.append(
+        check_e2_reproduction(
+            args.stream,
+            args.s2_a_metrics,
+            args.e2_summary,
+            args.e2_tolerance,
+            recording_scope,
+        )
+    )
     checks.append(pass_record("Segmental metrics reset at each recording boundary", {"grouping": ["fold", "recording_id"]}))
     checks.append(pass_record("Test split is not used for Stage-2 checkpoint or eta selection", {"selection_split": "val"}))
 

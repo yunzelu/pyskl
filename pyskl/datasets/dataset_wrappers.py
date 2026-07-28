@@ -24,8 +24,14 @@ class RepeatDataset:
         dataset['test_mode'] = test_mode
         self.dataset = build_dataset(dataset)
         self.times = times
-        if hasattr(dataset, 'class_prob'):
-            self.class_prob = dataset.class_prob
+        for attr in (
+            'class_prob',
+            'class_sample_strategy',
+            'class_sample_power',
+            'epoch_size',
+        ):
+            if hasattr(self.dataset, attr):
+                setattr(self, attr, getattr(self.dataset, attr))
 
         self._ori_len = len(self.dataset)
 

@@ -34,6 +34,12 @@ class PoseDataset(BaseDataset):
         class_prob (list | None): The class-specific multiplier, which should be a list of length 'num_classes', each
             element >= 1. The goal is to resample some rare classes to improve the overall performance. None means no
             resampling performed. Default: None.
+        class_sample_strategy (str | None): Epoch-wise class sampling strategy. ``sqrt`` samples classes with
+            probability proportional to square-root class counts, and ``power`` uses ``class_sample_power``.
+            This is mutually exclusive with class_prob. Default: None.
+        class_sample_power (float): Exponent used by ``class_sample_strategy``. Default: 0.5.
+        epoch_size (int | None): Number of global samples drawn before distributed sharding for each epoch. If None,
+            the sampler uses the dataset length. Default: None.
         memcached (bool): Whether keypoint is cached in memcached. If set as True, will use 'frame_dir' as the key to
             fetch 'keypoint' from memcached. Default: False.
         mc_cfg (tuple): The config for memcached client, only applicable if `memcached==True`.
@@ -48,6 +54,9 @@ class PoseDataset(BaseDataset):
                  valid_ratio=None,
                  box_thr=None,
                  class_prob=None,
+                 class_sample_strategy=None,
+                 class_sample_power=0.5,
+                 epoch_size=None,
                  memcached=False,
                  mc_cfg=('localhost', 22077),
                  **kwargs):
@@ -60,6 +69,21 @@ class PoseDataset(BaseDataset):
         # box_thr, which should be a string
         self.box_thr = box_thr
         self.class_prob = class_prob
+        self.class_sample_strategy = class_sample_strategy
+        self.class_sample_power = float(class_sample_power)
+        self.epoch_size = None if epoch_size is None else int(epoch_size)
+        if self.class_prob is not None and self.class_sample_strategy is not None:
+            raise ValueError("class_prob and class_sample_strategy are mutually exclusive")
+        if self.class_sample_strategy is not None:
+            if self.class_sample_strategy not in ('sqrt', 'power'):
+                raise ValueError(
+                    f"Unsupported class_sample_strategy: {self.class_sample_strategy}")
+            if self.class_sample_strategy == 'sqrt' and abs(self.class_sample_power - 0.5) > 1e-12:
+                raise ValueError("class_sample_strategy='sqrt' requires class_sample_power=0.5")
+            if self.class_sample_power < 0:
+                raise ValueError("class_sample_power must be non-negative")
+        if self.epoch_size is not None and self.epoch_size <= 0:
+            raise ValueError("epoch_size must be positive")
         if self.box_thr is not None:
             assert box_thr in [.5, .6, .7, .8, .9]
 

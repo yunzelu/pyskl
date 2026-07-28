@@ -9,7 +9,9 @@ from mmcv.runner import get_dist_info
 from mmcv.utils import Registry, build_from_cfg, digit_version
 from torch.utils.data import DataLoader
 
-from .samplers import ClassSpecificDistributedSampler, DistributedSampler
+from .samplers import (
+    ClassBalancedDistributedSampler, ClassSpecificDistributedSampler,
+    DistributedSampler)
 
 if platform.system() != 'Windows':
     # https://github.com/pytorch/pytorch/issues/973
@@ -77,7 +79,20 @@ def build_dataloader(dataset,
     """
     rank, world_size = get_dist_info()
 
-    if hasattr(dataset, 'class_prob') and dataset.class_prob is not None:
+    class_sample_strategy = getattr(dataset, 'class_sample_strategy', None)
+    if class_sample_strategy is not None:
+        if class_sample_strategy not in ('sqrt', 'power'):
+            raise ValueError(
+                f'Unsupported class_sample_strategy: {class_sample_strategy}')
+        sampler = ClassBalancedDistributedSampler(
+            dataset,
+            world_size,
+            rank,
+            class_sample_power=dataset.class_sample_power,
+            epoch_size=dataset.epoch_size,
+            shuffle=shuffle,
+            seed=seed)
+    elif hasattr(dataset, 'class_prob') and dataset.class_prob is not None:
         sampler = ClassSpecificDistributedSampler(
             dataset,
             world_size,

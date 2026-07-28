@@ -85,7 +85,9 @@ class S2FoldSpec:
         raise ValueError(f"Split {split!r} does not map to one subject")
 
 
-def protocol_metadata() -> dict[str, Any]:
+def protocol_metadata(recording_scope: str | None = None) -> dict[str, Any]:
+    if recording_scope is None:
+        recording_scope = "all JSONL recordings"
     return {
         "experiment": "S2",
         "fps": FPS,
@@ -97,7 +99,7 @@ def protocol_metadata() -> dict[str, Any]:
         "center_convention": "center_frame = start_frame + window_size // 2",
         "tail_window": False,
         "temporal_padding": False,
-        "default_recording_scope": "non-walk sessions, matching thesis/e2 untrimmed evaluation",
+        "default_recording_scope": recording_scope,
         "segmental_metric_resolution_seconds": STRIDE / FPS,
         "model_selection": {
             "stage1": "trimmed validation macro_f1 from existing E2 checkpoint",

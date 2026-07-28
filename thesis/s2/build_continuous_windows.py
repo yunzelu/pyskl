@@ -643,13 +643,15 @@ def build_continuous_dataset(
                 )
 
     output_pkl.parent.mkdir(parents=True, exist_ok=True)
+    recording_scope = "all sessions" if include_walk_sessions else "non-walk sessions"
+
     with output_pkl.open("wb") as handle:
         pickle.dump(
             {
                 "split": split,
                 "annotations": annotations,
                 "labels": LABELS,
-                "protocol": protocol_metadata(),
+                "protocol": protocol_metadata(recording_scope),
             },
             handle,
             protocol=pickle.HIGHEST_PROTOCOL,
@@ -709,8 +711,8 @@ def build_continuous_dataset(
         "labels": LABELS,
         "label_to_id": LABEL_TO_ID,
         "etas": list(etas),
-        "protocol": protocol_metadata(),
-        "recording_scope": "all sessions" if include_walk_sessions else "non-walk sessions",
+        "protocol": protocol_metadata(recording_scope),
+        "recording_scope": recording_scope,
         "min_valid_ratio": min_valid_ratio,
         "min_valid_frames": min_valid_frames,
         "max_timestamp_gap_sec": max_timestamp_gap_sec,
@@ -748,7 +750,19 @@ def parse_args() -> argparse.Namespace:
         default=0.5,
         help="Drop windows with adjacent timestamp jumps above this value. Use a negative value to disable.",
     )
-    parser.add_argument("--include-walk-sessions", action="store_true")
+    parser.set_defaults(include_walk_sessions=True)
+    parser.add_argument(
+        "--include-walk-sessions",
+        dest="include_walk_sessions",
+        action="store_true",
+        help="Include walk recordings. This is the default for the current S2 protocol.",
+    )
+    parser.add_argument(
+        "--exclude-walk-sessions",
+        dest="include_walk_sessions",
+        action="store_false",
+        help="Skip walk recordings to reproduce older non-walk-only debug artifacts.",
+    )
     parser.add_argument("--label-source", choices=["origin", "jsonl", "auto"], default="origin")
     parser.add_argument("--allow-label-mismatch", action="store_true")
     parser.add_argument("--overwrite", action="store_true")

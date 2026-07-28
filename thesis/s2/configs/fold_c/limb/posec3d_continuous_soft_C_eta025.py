@@ -52,19 +52,23 @@ right_limb = [1, 4, 5, 9, 10, 11, 13, 15]
 train_split = 'fold_c_train'
 val_split = 'fold_c_val'
 test_split = 'fold_c_test'
-# Stage-2 class_prob is computed from this fold's continuous training windows only.
-# class_prob strategy: train_inverse_mean; cap: 4
-# Train window counts:
-# Falling: 1678
-# Lying-Stationary: 10982
-# Sit-Stationary: 4881
-# Transition-LayBed-to-Sit: 2190
-# Transition-LayFloor-to-Stand: 4739
-# Transition-Sit-to-LayBed: 1804
-# Transition-Sit-to-Stand: 1783
-# Transition-Stand-to-Sit: 2049
-# Walking: 25932
-class_prob = [3.71063, 1, 1.27565, 2.84313, 1.31387, 3.45147, 3.49212, 3.03877, 1]
+# Stage-2 training samples are drawn each epoch from pre-gridded train windows.
+# class_sample_strategy: sqrt; class_sample_power: 0.5; epoch_size: 65362
+# Class draw rule: P(c) = n_c ** class_sample_power / sum_j n_j ** class_sample_power.
+# After drawing a class, one pre-gridded window from that class is sampled uniformly with replacement.
+# Train window counts and expected draws per epoch:
+# Falling: n=1678, p=0.063119, expected_epoch_samples=4125.6
+# Lying-Stationary: n=10982, p=0.161474, expected_epoch_samples=10554.2
+# Sit-Stationary: n=4881, p=0.107650, expected_epoch_samples=7036.2
+# Transition-LayBed-to-Sit: n=2190, p=0.072108, expected_epoch_samples=4713.1
+# Transition-LayFloor-to-Stand: n=4739, p=0.106073, expected_epoch_samples=6933.1
+# Transition-Sit-to-LayBed: n=1804, p=0.065445, expected_epoch_samples=4277.6
+# Transition-Sit-to-Stand: n=1783, p=0.065063, expected_epoch_samples=4252.7
+# Transition-Stand-to-Sit: n=2049, p=0.069748, expected_epoch_samples=4558.9
+# Walking: n=35256, p=0.289319, expected_epoch_samples=18910.5
+class_sample_strategy = 'sqrt'
+class_sample_power = 0.5
+epoch_size = 65362
 
 generate_pose_target = dict(
     joint=dict(with_kp=True, with_limb=False),
@@ -143,7 +147,9 @@ data = dict(
         ann_file=ann_file,
         pipeline=train_pipeline,
         split=train_split,
-        class_prob=class_prob
+        class_sample_strategy=class_sample_strategy,
+        class_sample_power=class_sample_power,
+        epoch_size=epoch_size
     ),
     val=dict(type=dataset_type, ann_file=ann_file, split=val_split, pipeline=val_pipeline),
     test=dict(type=dataset_type, ann_file=ann_file, split=test_split, pipeline=test_pipeline)

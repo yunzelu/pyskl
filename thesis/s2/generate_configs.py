@@ -6,12 +6,7 @@ import argparse
 from pathlib import Path
 
 try:
-    from .class_balance import (
-        CLASS_PROB_STRATEGIES,
-        compute_class_prob,
-        format_prob,
-        train_label_counts_by_fold,
-    )
+    from .class_balance import train_label_counts_by_fold
     from .common import (
         DEFAULT_CONFIG_DIR,
         DEFAULT_ETAS,
@@ -26,12 +21,7 @@ try:
         write_json,
     )
 except ImportError:
-    from class_balance import (
-        CLASS_PROB_STRATEGIES,
-        compute_class_prob,
-        format_prob,
-        train_label_counts_by_fold,
-    )
+    from class_balance import train_label_counts_by_fold
     from common import (
         DEFAULT_CONFIG_DIR,
         DEFAULT_ETAS,
@@ -46,6 +36,8 @@ except ImportError:
         write_json,
     )
 
+
+CLASS_SAMPLE_STRATEGIES = ("sqrt", "power", "none")
 
 SKELETON_BLOCK = """# COCO-17 left/right keypoint ids
 left_kp = [1, 3, 5, 7, 9, 11, 13, 15]
@@ -160,19 +152,71 @@ def fold_comment(fold: S2FoldSpec) -> str:
     )
 
 
-def class_balance_comment(
+def class_sampling_probs(counts: list[int], power: float) -> list[float]:
+    if len(counts) != len(LABELS):
+        raise ValueError(f"Expected {len(LABELS)} class counts, got {len(counts)}")
+    if power < 0:
+        raise ValueError("class_sample_power must be non-negative")
+    weights = [float(count) ** power if count > 0 else 0.0 for count in counts]
+    total = sum(weights)
+    if total <= 0:
+        raise ValueError("Cannot compute class sampling probabilities without positive class counts")
+    return [weight / total for weight in weights]
+
+
+def class_sampling_comment(
     counts: list[int],
     strategy: str,
-    cap: float,
+    power: float,
+    epoch_size: int,
 ) -> str:
     lines = [
-        "# Stage-2 class_prob is computed from this fold's continuous training windows only.",
-        f"# class_prob strategy: {strategy}; cap: {cap:g}",
-        "# Train window counts:",
+        "# Stage-2 training samples are drawn each epoch from pre-gridded train windows.",
+        f"# class_sample_strategy: {strategy}; class_sample_power: {power:g}; epoch_size: {epoch_size}",
     ]
-    for label, count in zip(LABELS, counts):
-        lines.append(f"# {label}: {int(count)}")
+    if strategy == "none":
+        lines.append("# Training uses the natural materialized-window distribution.")
+        lines.append("# Train window counts:")
+        for label, count in zip(LABELS, counts):
+            lines.append(f"# {label}: n={int(count)}")
+    else:
+        probs = class_sampling_probs(counts, power)
+        lines.extend(
+            [
+                "# Class draw rule: P(c) = n_c ** class_sample_power / sum_j n_j ** class_sample_power.",
+                "# After drawing a class, one pre-gridded window from that class is sampled uniformly with replacement.",
+                "# Train window counts and expected draws per epoch:",
+            ]
+        )
+        for label, count, prob in zip(LABELS, counts, probs):
+            expected = prob * epoch_size
+            lines.append(
+                f"# {label}: n={int(count)}, p={prob:.6f}, expected_epoch_samples={expected:.1f}")
     return "\n".join(lines) + "\n"
+
+
+def class_sampling_config(
+    strategy: str,
+    power: float,
+    epoch_size: int,
+) -> str:
+    if strategy == "none":
+        return ""
+    return (
+        f"class_sample_strategy = {strategy!r}\n"
+        f"class_sample_power = {power:.12g}\n"
+        f"epoch_size = {int(epoch_size)}\n\n"
+    )
+
+
+def class_sampling_train_kwargs(strategy: str) -> str:
+    if strategy == "none":
+        return ""
+    return (
+        "        class_sample_strategy=class_sample_strategy,\n"
+        "        class_sample_power=class_sample_power,\n"
+        "        epoch_size=epoch_size\n"
+    )
 
 
 def header(method: str, fold: S2FoldSpec, stream: str, eta: float | None = None) -> str:
@@ -244,10 +288,10 @@ def stage2_config_text(
     videos_per_gpu: int,
     workers_per_gpu: int,
     test_videos_per_gpu: int,
-    class_prob: list[float],
     class_counts: list[int],
-    class_prob_strategy: str,
-    class_prob_cap: float,
+    class_sample_strategy: str,
+    class_sample_power: float,
+    epoch_size: int,
 ) -> str:
     if method not in {"B", "C"}:
         raise ValueError(method)
@@ -280,8 +324,9 @@ def stage2_config_text(
         + f"train_split = {fold.split_key('train')!r}\n"
         + f"val_split = {fold.split_key('val')!r}\n"
         + f"test_split = {fold.split_key('test')!r}\n"
-        + class_balance_comment(class_counts, class_prob_strategy, class_prob_cap)
-        + f"class_prob = {format_prob(class_prob)}\n\n"
+        + class_sampling_comment(
+            class_counts, class_sample_strategy, class_sample_power, epoch_size)
+        + class_sampling_config(class_sample_strategy, class_sample_power, epoch_size)
         + PIPELINE_BLOCK.format(soft_target_stage=soft_target_stage)
         + "\n"
         + "find_unused_parameters = False\n"
@@ -298,7 +343,7 @@ def stage2_config_text(
         + "        ann_file=ann_file,\n"
         + "        pipeline=train_pipeline,\n"
         + "        split=train_split,\n"
-        + "        class_prob=class_prob\n"
+        + class_sampling_train_kwargs(class_sample_strategy)
         + "    ),\n"
         + "    val=dict(type=dataset_type, ann_file=ann_file, split=val_split, pipeline=val_pipeline),\n"
         + "    test=dict(type=dataset_type, ann_file=ann_file, split=test_split, pipeline=test_pipeline)\n"
@@ -367,10 +412,10 @@ def generate_configs(
     videos_per_gpu: int,
     workers_per_gpu: int,
     test_videos_per_gpu: int,
-    class_probs_by_fold: dict[str, list[float]],
     class_counts_by_fold: dict[str, list[int]],
-    class_prob_strategy: str,
-    class_prob_cap: float,
+    class_sample_strategy: str,
+    class_sample_power: float,
+    epoch_size_by_fold: dict[str, int],
     config_dir: Path,
     overwrite: bool,
 ) -> dict[str, list[str]]:
@@ -405,10 +450,10 @@ def generate_configs(
                     videos_per_gpu,
                     workers_per_gpu,
                     test_videos_per_gpu,
-                    class_probs_by_fold[fold.fold],
                     class_counts_by_fold[fold.fold],
-                    class_prob_strategy,
-                    class_prob_cap,
+                    class_sample_strategy,
+                    class_sample_power,
+                    epoch_size_by_fold[fold.fold],
                 ),
                 overwrite,
             )
@@ -429,10 +474,10 @@ def generate_configs(
                         videos_per_gpu,
                         workers_per_gpu,
                         test_videos_per_gpu,
-                        class_probs_by_fold[fold.fold],
                         class_counts_by_fold[fold.fold],
-                        class_prob_strategy,
-                        class_prob_cap,
+                        class_sample_strategy,
+                        class_sample_power,
+                        epoch_size_by_fold[fold.fold],
                     ),
                     overwrite,
                 )
@@ -453,16 +498,31 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--workers-per-gpu", type=int, default=1)
     parser.add_argument("--test-videos-per-gpu", type=int, default=1)
     parser.add_argument(
-        "--class-prob-strategy",
-        choices=CLASS_PROB_STRATEGIES,
-        default="train_inverse_mean",
+        "--class-sample-strategy",
+        choices=CLASS_SAMPLE_STRATEGIES,
+        default="sqrt",
         help=(
-            "Sampler multipliers for Stage-2 training. The default computes "
-            "fold-specific capped inverse-frequency multipliers from the "
-            "continuous training split only."
+            "Stage-2 epoch sampler. 'sqrt' draws classes with probability "
+            "proportional to sqrt(train_window_count), then draws one "
+            "pre-gridded window from that class. 'none' keeps the natural "
+            "materialized-window distribution."
         ),
     )
-    parser.add_argument("--class-prob-cap", type=float, default=4.0)
+    parser.add_argument(
+        "--class-sample-power",
+        type=float,
+        default=0.5,
+        help="Exponent for class-count sampling; square-root sampling uses 0.5.",
+    )
+    parser.add_argument(
+        "--epoch-size",
+        type=int,
+        default=None,
+        help=(
+            "Global samples drawn before distributed sharding each epoch. "
+            "Default: this fold's number of materialized training windows."
+        ),
+    )
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 
@@ -479,8 +539,12 @@ def main() -> None:
         raise ValueError("--workers-per-gpu must be non-negative")
     if args.test_videos_per_gpu <= 0:
         raise ValueError("--test-videos-per-gpu must be positive")
-    if args.class_prob_cap < 1:
-        raise ValueError("--class-prob-cap must be >= 1")
+    if args.class_sample_power < 0:
+        raise ValueError("--class-sample-power must be non-negative")
+    if args.class_sample_strategy == "sqrt" and abs(args.class_sample_power - 0.5) > 1e-12:
+        raise ValueError("--class-sample-strategy sqrt requires --class-sample-power 0.5")
+    if args.epoch_size is not None and args.epoch_size <= 0:
+        raise ValueError("--epoch-size must be positive")
 
     folds = discover_s2_folds()
     if args.folds:
@@ -491,12 +555,10 @@ def main() -> None:
             raise ValueError(f"Unknown fold(s): {missing}")
 
     class_counts_by_fold = train_label_counts_by_fold(args.ann_file, folds)
-    class_probs_by_fold = {
-        fold.fold: compute_class_prob(
-            class_counts_by_fold[fold.fold],
-            args.class_prob_strategy,
-            args.class_prob_cap,
-        )
+    epoch_size_by_fold = {
+        fold.fold: int(args.epoch_size)
+        if args.epoch_size is not None
+        else int(sum(class_counts_by_fold[fold.fold]))
         for fold in folds
     }
 
@@ -510,13 +572,33 @@ def main() -> None:
         videos_per_gpu=args.videos_per_gpu,
         workers_per_gpu=args.workers_per_gpu,
         test_videos_per_gpu=args.test_videos_per_gpu,
-        class_probs_by_fold=class_probs_by_fold,
         class_counts_by_fold=class_counts_by_fold,
-        class_prob_strategy=args.class_prob_strategy,
-        class_prob_cap=args.class_prob_cap,
+        class_sample_strategy=args.class_sample_strategy,
+        class_sample_power=args.class_sample_power,
+        epoch_size_by_fold=epoch_size_by_fold,
         config_dir=args.output_dir,
         overwrite=args.overwrite,
     )
+    class_sampling_probs_by_fold = {
+        fold.fold: (
+            None
+            if args.class_sample_strategy == "none"
+            else class_sampling_probs(
+                class_counts_by_fold[fold.fold], args.class_sample_power)
+        )
+        for fold in folds
+    }
+    expected_epoch_samples_by_fold = {
+        fold.fold: (
+            None
+            if class_sampling_probs_by_fold[fold.fold] is None
+            else [
+                prob * epoch_size_by_fold[fold.fold]
+                for prob in class_sampling_probs_by_fold[fold.fold]
+            ]
+        )
+        for fold in folds
+    }
     summary_path = args.output_dir / "config_manifest.json"
     write_json(
         summary_path,
@@ -530,10 +612,12 @@ def main() -> None:
             "videos_per_gpu": args.videos_per_gpu,
             "workers_per_gpu": args.workers_per_gpu,
             "test_videos_per_gpu": args.test_videos_per_gpu,
-            "class_prob_strategy": args.class_prob_strategy,
-            "class_prob_cap": args.class_prob_cap,
+            "class_sample_strategy": args.class_sample_strategy,
+            "class_sample_power": args.class_sample_power,
+            "epoch_size_by_fold": epoch_size_by_fold,
             "class_counts_by_fold": class_counts_by_fold,
-            "class_probs_by_fold": class_probs_by_fold,
+            "class_sampling_probs_by_fold": class_sampling_probs_by_fold,
+            "expected_epoch_samples_by_fold": expected_epoch_samples_by_fold,
             "labels": LABELS,
             "configs": outputs,
         },

@@ -10,7 +10,8 @@ Default protocol:
 - Stride: `10` frames
 - Center frame: `start + 30`
 - No tail windows and no temporal zero padding
-- Default recording scope: non-walk sessions, matching `thesis/e2`
+- Default recording scope: all JSONL recordings under
+  `data/radar_v4/raw_jsonl/yolo26xpose`
 - Segmental metrics are computed on the center-time grid: one step every 10
   video frames, about `0.333` seconds
 
@@ -20,7 +21,7 @@ Prepare S2 artifacts:
 python thesis/s2/stage1_report.py --overwrite
 python thesis/s2/build_continuous_windows.py --overwrite
 python thesis/s2/generate_configs.py --overwrite
-python thesis/s2/class_balance.py --overwrite
+python thesis/s2/class_sampling_report.py --overwrite
 python thesis/s2/sanity_check.py --overwrite
 ```
 
@@ -30,10 +31,14 @@ pickle is large, so these defaults are intentionally lower than the E2
 trimmed-clip batch settings to avoid CPU RAM exhaustion when DDP ranks and
 dataloader workers replicate dataset state.
 
-Stage-2 configs default to `--class-prob-strategy train_inverse_mean` with
-`--class-prob-cap 4.0`. This computes sampler multipliers from each fold's
-continuous training windows only. Use `--class-prob-strategy stage1` to reproduce
-the older trimmed-stage heuristic `[2, 1, 2, 2, 2, 2, 1, 1, 1]`.
+Stage-2 configs default to `--class-sample-strategy sqrt` and
+`--class-sample-power 0.5`. Training first pre-grids every valid stride-10
+window, then each epoch draws `epoch_size` windows with replacement. The class
+draw rule is `P(c) = sqrt(n_c) / sum_j sqrt(n_j)`, where `n_c` is the fold's
+training-window count for class `c`; after drawing a class, one pre-gridded
+window from that class is sampled uniformly. This reduces redundant centers from
+long state intervals while still oversampling transition classes relative to the
+natural sliding-window distribution.
 
 Compute-saving local Method A reproduction from existing E2 scores:
 
