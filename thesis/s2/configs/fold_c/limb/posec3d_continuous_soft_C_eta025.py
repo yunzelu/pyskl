@@ -53,22 +53,22 @@ train_split = 'fold_c_train'
 val_split = 'fold_c_val'
 test_split = 'fold_c_test'
 # Stage-2 training samples are drawn each epoch from pre-gridded train windows.
-# class_sample_strategy: sqrt; class_sample_power: 0.5; epoch_size: 65362
+# class_sample_strategy: sqrt; class_sample_power: 0.5; epoch_size: 56038
 # Class draw rule: P(c) = n_c ** class_sample_power / sum_j n_j ** class_sample_power.
 # After drawing a class, one pre-gridded window from that class is sampled uniformly with replacement.
 # Train window counts and expected draws per epoch:
-# Falling: n=1678, p=0.063119, expected_epoch_samples=4125.6
-# Lying-Stationary: n=10982, p=0.161474, expected_epoch_samples=10554.2
-# Sit-Stationary: n=4881, p=0.107650, expected_epoch_samples=7036.2
-# Transition-LayBed-to-Sit: n=2190, p=0.072108, expected_epoch_samples=4713.1
-# Transition-LayFloor-to-Stand: n=4739, p=0.106073, expected_epoch_samples=6933.1
-# Transition-Sit-to-LayBed: n=1804, p=0.065445, expected_epoch_samples=4277.6
-# Transition-Sit-to-Stand: n=1783, p=0.065063, expected_epoch_samples=4252.7
-# Transition-Stand-to-Sit: n=2049, p=0.069748, expected_epoch_samples=4558.9
-# Walking: n=35256, p=0.289319, expected_epoch_samples=18910.5
+# Falling: n=1678, p=0.065830, expected_epoch_samples=3689.0
+# Lying-Stationary: n=10982, p=0.168410, expected_epoch_samples=9437.4
+# Sit-Stationary: n=4881, p=0.112275, expected_epoch_samples=6291.7
+# Transition-LayBed-to-Sit: n=2190, p=0.075206, expected_epoch_samples=4214.4
+# Transition-LayFloor-to-Stand: n=4739, p=0.110630, expected_epoch_samples=6199.5
+# Transition-Sit-to-LayBed: n=1804, p=0.068257, expected_epoch_samples=3825.0
+# Transition-Sit-to-Stand: n=1783, p=0.067858, expected_epoch_samples=3802.7
+# Transition-Stand-to-Sit: n=2049, p=0.072744, expected_epoch_samples=4076.4
+# Walking: n=25932, p=0.258789, expected_epoch_samples=14502.0
 class_sample_strategy = 'sqrt'
 class_sample_power = 0.5
-epoch_size = 65362
+epoch_size = 56038
 
 generate_pose_target = dict(
     joint=dict(with_kp=True, with_limb=False),

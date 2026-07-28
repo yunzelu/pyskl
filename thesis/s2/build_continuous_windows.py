@@ -750,18 +750,18 @@ def parse_args() -> argparse.Namespace:
         default=0.5,
         help="Drop windows with adjacent timestamp jumps above this value. Use a negative value to disable.",
     )
-    parser.set_defaults(include_walk_sessions=True)
+    parser.set_defaults(include_walk_sessions=False)
     parser.add_argument(
         "--include-walk-sessions",
         dest="include_walk_sessions",
         action="store_true",
-        help="Include walk recordings. This is the default for the current S2 protocol.",
+        help="Include walk-only recordings as an explicit ablation/debug override.",
     )
     parser.add_argument(
         "--exclude-walk-sessions",
         dest="include_walk_sessions",
         action="store_false",
-        help="Skip walk recordings to reproduce older non-walk-only debug artifacts.",
+        help="Skip walk-only recordings. This is the default S2 protocol.",
     )
     parser.add_argument("--label-source", choices=["origin", "jsonl", "auto"], default="origin")
     parser.add_argument("--allow-label-mismatch", action="store_true")

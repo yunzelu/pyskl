@@ -10,8 +10,9 @@ Default protocol:
 - Stride: `10` frames
 - Center frame: `start + 30`
 - No tail windows and no temporal zero padding
-- Default recording scope: all JSONL recordings under
-  `data/radar_v4/raw_jsonl/yolo26xpose`
+- Default recording scope: non-walk JSONL recordings under
+  `data/radar_v4/raw_jsonl/yolo26xpose`; walk-only sessions ending in
+  `-walk` are excluded from both training and evaluation
 - Segmental metrics are computed on the center-time grid: one step every 10
   video frames, about `0.333` seconds
 

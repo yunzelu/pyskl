@@ -3,7 +3,7 @@
 #SBATCH --gpus-per-node=a100:4
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=62G
-#SBATCH --time=08:00:00
+#SBATCH --time=12:00:00
 #SBATCH --job-name=s2_posec3d
 #SBATCH --output=thesis/s2/%x_%j.out
 #SBATCH --mail-user=yunzelu@outlook.com
@@ -18,7 +18,7 @@ cd ~/projects/def-mbolic/yunzelu/pyskl/
 
 GPUS="${GPUS:-4}"
 SEED="${SEED:-42}"
-RUN_FOLDS="${RUN_FOLDS:-b}"
+RUN_FOLDS="${RUN_FOLDS:-a}"
 RUN_STREAMS="${RUN_STREAMS:-joint}"
 RUN_METHODS="${RUN_METHODS:-A B C050}"
 RUN_EXTRA_C_ETAS="${RUN_EXTRA_C_ETAS:-0}"
@@ -27,7 +27,7 @@ S2_WORKERS_PER_GPU="${S2_WORKERS_PER_GPU:-1}"
 S2_CLASS_SAMPLE_STRATEGY="${S2_CLASS_SAMPLE_STRATEGY:-sqrt}"
 S2_CLASS_SAMPLE_POWER="${S2_CLASS_SAMPLE_POWER:-0.5}"
 S2_EPOCH_SIZE="${S2_EPOCH_SIZE:-}"
-S2_INCLUDE_WALK_SESSIONS="${S2_INCLUDE_WALK_SESSIONS:-1}"
+S2_INCLUDE_WALK_SESSIONS="${S2_INCLUDE_WALK_SESSIONS:-0}"
 
 # python thesis/s2/stage1_report.py --overwrite
 BUILD_WINDOW_ARGS=(--folds ${RUN_FOLDS} --overwrite)

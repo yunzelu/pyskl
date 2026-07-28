@@ -87,7 +87,7 @@ class S2FoldSpec:
 
 def protocol_metadata(recording_scope: str | None = None) -> dict[str, Any]:
     if recording_scope is None:
-        recording_scope = "all JSONL recordings"
+        recording_scope = "non-walk sessions"
     return {
         "experiment": "S2",
         "fps": FPS,
