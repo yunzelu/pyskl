@@ -22,6 +22,8 @@ try:
         METHOD_B,
         METHOD_C,
         METHODS,
+        MIN_VALID_FRAMES_AFTER_ZERO_FILTER,
+        MIN_VALID_FRAME_RATIO_AFTER_ZERO_FILTER,
         STRIDE,
         WINDOW_SIZE,
         S2FoldSpec,
@@ -53,6 +55,8 @@ except ImportError:
         METHOD_B,
         METHOD_C,
         METHODS,
+        MIN_VALID_FRAMES_AFTER_ZERO_FILTER,
+        MIN_VALID_FRAME_RATIO_AFTER_ZERO_FILTER,
         STRIDE,
         WINDOW_SIZE,
         S2FoldSpec,
@@ -284,12 +288,13 @@ def infer_session(
         batch_size=batch_size,
         device=device,
         img_shape=img_shape,
-        min_valid_ratio=0.0,
-        min_valid_frames=None,
+        min_valid_ratio=MIN_VALID_FRAME_RATIO_AFTER_ZERO_FILTER,
+        min_valid_frames=MIN_VALID_FRAMES_AFTER_ZERO_FILTER,
         include_tail=False,
         normalize_weights=True,
         score_output="logit",
         quiet=quiet,
+        squeeze_zero_frames=True,
     )
 
     rows: list[dict[str, Any]] = []

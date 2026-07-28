@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import pickle
 import re
 from collections import Counter, defaultdict
@@ -50,6 +51,8 @@ FINAL_LABELS = [
     "Walking",
 ]
 LABEL_TO_ID = {label: idx for idx, label in enumerate(FINAL_LABELS)}
+ZERO_FRAME_EPS = 1e-5
+MIN_VALID_FRAME_RATIO_AFTER_ZERO_FILTER = 0.5
 
 DROP_LABELS = {
     "Kneeling-Stationary",
@@ -85,12 +88,21 @@ class BuildStats:
     jsonl_files: int = 0
     source_segments: int = 0
     samples_created: int = 0
+    sample_candidates_before_zero_filter: int = 0
+    samples_kept_after_zero_filter: int = 0
+    samples_with_zero_frames_removed: int = 0
+    source_frames_before_zero_filter: int = 0
+    valid_frames_after_zero_filter: int = 0
+    zero_frames_removed: int = 0
+    zero_frame_filter_min_valid_frames: int = 0
     walking_windows_created: int = 0
     transition_segments_expanded: int = 0
     transition_segments_kept_original: int = 0
     stationary_segments_kept: int = 0
     dropped_segments_by_reason: Counter = field(default_factory=Counter)
     dropped_segments_by_label: Counter = field(default_factory=Counter)
+    dropped_samples_by_reason: Counter = field(default_factory=Counter)
+    dropped_samples_by_label: Counter = field(default_factory=Counter)
     label_source_counts: Counter = field(default_factory=Counter)
 
 
@@ -401,6 +413,48 @@ def make_frame_dir(
     )
 
 
+def nonzero_pose_frame_mask(
+    keypoint: np.ndarray,
+    keypoint_score: np.ndarray | None,
+) -> np.ndarray:
+    """Return frames that contain a detected pose rather than dense zero fill."""
+    if keypoint.ndim != 3:
+        raise ValueError(f"Expected keypoint shape [T,V,C], got {keypoint.shape}")
+
+    keypoint_nonzero = np.any(np.abs(keypoint) > ZERO_FRAME_EPS, axis=(1, 2))
+    if keypoint_score is None:
+        return keypoint_nonzero
+
+    if keypoint_score.ndim != 2 or keypoint_score.shape[0] != keypoint.shape[0]:
+        raise ValueError(
+            "keypoint_score must have shape [T,V] and match keypoint frames; "
+            f"got keypoint={keypoint.shape}, keypoint_score={keypoint_score.shape}"
+        )
+    score_nonzero = np.any(np.abs(keypoint_score) > ZERO_FRAME_EPS, axis=1)
+    return np.logical_or(keypoint_nonzero, score_nonzero)
+
+
+def record_zero_filter_stats(
+    stats: BuildStats,
+    original_label: Any,
+    filter_info: dict[str, int],
+    kept: bool,
+) -> None:
+    stats.sample_candidates_before_zero_filter += 1
+    stats.source_frames_before_zero_filter += filter_info["source_frames"]
+    stats.valid_frames_after_zero_filter += filter_info["valid_frames"]
+    stats.zero_frames_removed += filter_info["zero_frames_removed"]
+    if filter_info["zero_frames_removed"] > 0:
+        stats.samples_with_zero_frames_removed += 1
+
+    if kept:
+        stats.samples_kept_after_zero_filter += 1
+        return
+
+    stats.dropped_samples_by_reason["valid_frames_below_min_after_zero_filter"] += 1
+    stats.dropped_samples_by_label[str(original_label)] += 1
+
+
 def build_annotation(
     session: SessionData,
     segment: dict[str, Any],
@@ -409,7 +463,8 @@ def build_annotation(
     sample_end: int,
     sample_type: str,
     sample_index: int,
-) -> dict[str, Any]:
+    min_valid_frames: int,
+) -> tuple[dict[str, Any] | None, dict[str, int]]:
     source_segment_id = int(segment.get("source_segment_id", sample_index))
     frame_dir = make_frame_dir(
         session_name=session.session_name,
@@ -421,7 +476,24 @@ def build_annotation(
         sample_index=sample_index,
     )
 
-    keypoint = session.keypoint[sample_start:sample_end + 1][None, ...].copy()
+    source_keypoint = session.keypoint[sample_start:sample_end + 1]
+    source_keypoint_score = None
+    if session.keypoint_score is not None:
+        source_keypoint_score = session.keypoint_score[sample_start:sample_end + 1]
+
+    valid_mask = nonzero_pose_frame_mask(source_keypoint, source_keypoint_score)
+    source_frame_indices = np.arange(sample_start, sample_end + 1, dtype=np.int32)
+    valid_frame_indices = source_frame_indices[valid_mask]
+    valid_frames = int(valid_frame_indices.size)
+    filter_info = {
+        "source_frames": int(source_keypoint.shape[0]),
+        "valid_frames": valid_frames,
+        "zero_frames_removed": int(source_keypoint.shape[0] - valid_frames),
+    }
+    if valid_frames < min_valid_frames:
+        return None, filter_info
+
+    keypoint = source_keypoint[valid_mask][None, ...].copy()
 
     annotation = {
         "frame_dir": frame_dir,
@@ -438,19 +510,25 @@ def build_annotation(
         "segment_id": source_segment_id,
         "segment_start_frame": int(segment["start_frame"]),
         "segment_end_frame": int(segment["end_frame"]),
-        "start_frame": sample_start,
-        "end_frame": sample_end,
-        "total_frames": int(sample_end - sample_start + 1),
+        "source_start_frame": sample_start,
+        "source_end_frame": sample_end,
+        "start_frame": int(valid_frame_indices[0]),
+        "end_frame": int(valid_frame_indices[-1]),
+        "source_frame_indices": np.ascontiguousarray(valid_frame_indices),
+        "num_source_frames": filter_info["source_frames"],
+        "num_valid_frames": valid_frames,
+        "zero_frames_removed": filter_info["zero_frames_removed"],
+        "total_frames": valid_frames,
         "img_shape": session.img_shape,
         "original_shape": session.img_shape,
         "keypoint": np.ascontiguousarray(keypoint),
     }
 
-    if session.keypoint_score is not None:
-        keypoint_score = session.keypoint_score[sample_start:sample_end + 1][None, ...].copy()
+    if source_keypoint_score is not None:
+        keypoint_score = source_keypoint_score[valid_mask][None, ...].copy()
         annotation["keypoint_score"] = np.ascontiguousarray(keypoint_score)
 
-    return annotation
+    return annotation, filter_info
 
 
 def create_walking_windows(
@@ -458,28 +536,34 @@ def create_walking_windows(
     segment: dict[str, Any],
     clip_len: int,
     next_sample_index: int,
-) -> list[dict[str, Any]]:
+    min_valid_frames: int,
+    stats: BuildStats,
+) -> tuple[list[dict[str, Any]], int]:
     annotations: list[dict[str, Any]] = []
     start = int(segment["start_frame"])
     end = int(segment["end_frame"])
 
     window_start = start
+    candidate_windows = 0
     while window_start + clip_len - 1 <= end:
         window_end = window_start + clip_len - 1
-        annotations.append(
-            build_annotation(
-                session=session,
-                segment=segment,
-                cleaned_label="Walking",
-                sample_start=window_start,
-                sample_end=window_end,
-                sample_type="walk",
-                sample_index=next_sample_index + len(annotations),
-            )
+        candidate_windows += 1
+        annotation, filter_info = build_annotation(
+            session=session,
+            segment=segment,
+            cleaned_label="Walking",
+            sample_start=window_start,
+            sample_end=window_end,
+            sample_type="walk",
+            sample_index=next_sample_index + len(annotations),
+            min_valid_frames=min_valid_frames,
         )
+        record_zero_filter_stats(stats, "Walking", filter_info, annotation is not None)
+        if annotation is not None:
+            annotations.append(annotation)
         window_start += clip_len
 
-    return annotations
+    return annotations, candidate_windows
 
 
 def create_transition_sample(
@@ -488,24 +572,27 @@ def create_transition_sample(
     cleaned_label: str,
     clip_len: int,
     sample_index: int,
-) -> tuple[dict[str, Any] | None, bool]:
+    min_valid_frames: int,
+    stats: BuildStats,
+) -> tuple[dict[str, Any] | None, bool, str | None]:
     start = int(segment["start_frame"])
     end = int(segment["end_frame"])
     length = end - start + 1
 
     if length >= clip_len:
-        return (
-            build_annotation(
-                session=session,
-                segment=segment,
-                cleaned_label=cleaned_label,
-                sample_start=start,
-                sample_end=end,
-                sample_type="transition",
-                sample_index=sample_index,
-            ),
-            False,
+        annotation, filter_info = build_annotation(
+            session=session,
+            segment=segment,
+            cleaned_label=cleaned_label,
+            sample_start=start,
+            sample_end=end,
+            sample_type="transition",
+            sample_index=sample_index,
+            min_valid_frames=min_valid_frames,
         )
+        record_zero_filter_stats(stats, cleaned_label, filter_info, annotation is not None)
+        drop_reason = None if annotation is not None else "valid_frames_below_min_after_zero_filter"
+        return annotation, False, drop_reason
 
     window = centered_transition_window(
         start=start,
@@ -514,21 +601,22 @@ def create_transition_sample(
         total_frames=session.total_frames,
     )
     if window is None:
-        return None, True
+        return None, True, "transition_context_outside_source"
 
     window_start, window_end = window
-    return (
-        build_annotation(
-            session=session,
-            segment=segment,
-            cleaned_label=cleaned_label,
-            sample_start=window_start,
-            sample_end=window_end,
-            sample_type="transition_ctx",
-            sample_index=sample_index,
-        ),
-        True,
+    annotation, filter_info = build_annotation(
+        session=session,
+        segment=segment,
+        cleaned_label=cleaned_label,
+        sample_start=window_start,
+        sample_end=window_end,
+        sample_type="transition_ctx",
+        sample_index=sample_index,
+        min_valid_frames=min_valid_frames,
     )
+    record_zero_filter_stats(stats, cleaned_label, filter_info, annotation is not None)
+    drop_reason = None if annotation is not None else "valid_frames_below_min_after_zero_filter"
+    return annotation, True, drop_reason
 
 
 def create_stationary_sample(
@@ -536,8 +624,10 @@ def create_stationary_sample(
     segment: dict[str, Any],
     cleaned_label: str,
     sample_index: int,
-) -> dict[str, Any]:
-    return build_annotation(
+    min_valid_frames: int,
+    stats: BuildStats,
+) -> tuple[dict[str, Any] | None, dict[str, int]]:
+    annotation, filter_info = build_annotation(
         session=session,
         segment=segment,
         cleaned_label=cleaned_label,
@@ -545,7 +635,10 @@ def create_stationary_sample(
         sample_end=int(segment["end_frame"]),
         sample_type="stationary",
         sample_index=sample_index,
+        min_valid_frames=min_valid_frames,
     )
+    record_zero_filter_stats(stats, cleaned_label, filter_info, annotation is not None)
+    return annotation, filter_info
 
 
 def build_annotations(
@@ -556,6 +649,8 @@ def build_annotations(
 ) -> tuple[list[dict[str, Any]], BuildStats]:
     annotations: list[dict[str, Any]] = []
     stats = BuildStats()
+    min_valid_frames = math.ceil(clip_len * MIN_VALID_FRAME_RATIO_AFTER_ZERO_FILTER)
+    stats.zero_frame_filter_min_valid_frames = min_valid_frames
     jsonl_paths = sorted(jsonl_root.rglob("*.jsonl"))
 
     for jsonl_path in jsonl_paths:
@@ -585,13 +680,15 @@ def build_annotations(
                     stats.dropped_segments_by_label[str(original_label)] += 1
                     continue
 
-                windows = create_walking_windows(
+                windows, candidate_windows = create_walking_windows(
                     session=session,
                     segment=segment,
                     clip_len=clip_len,
                     next_sample_index=sample_index,
+                    min_valid_frames=min_valid_frames,
+                    stats=stats,
                 )
-                if not windows:
+                if not candidate_windows:
                     stats.dropped_segments_by_reason["walking_shorter_than_clip_len"] += 1
                     stats.dropped_segments_by_label[str(original_label)] += 1
                     continue
@@ -601,21 +698,24 @@ def build_annotations(
                 continue
 
             if is_transition_label(cleaned):
-                annotation, expanded = create_transition_sample(
+                annotation, expanded, drop_reason = create_transition_sample(
                     session=session,
                     segment=segment,
                     cleaned_label=cleaned,
                     clip_len=clip_len,
                     sample_index=sample_index,
+                    min_valid_frames=min_valid_frames,
+                    stats=stats,
                 )
                 if annotation is None:
-                    stats.dropped_segments_by_reason["transition_context_outside_source"] += 1
-                    stats.dropped_segments_by_label[str(original_label)] += 1
-                    print(
-                        "[DROP] transition context outside source: "
-                        f"{session.session_name} {original_label} "
-                        f"{segment['start_frame']}-{segment['end_frame']}"
-                    )
+                    if drop_reason == "transition_context_outside_source":
+                        stats.dropped_segments_by_reason["transition_context_outside_source"] += 1
+                        stats.dropped_segments_by_label[str(original_label)] += 1
+                        print(
+                            "[DROP] transition context outside source: "
+                            f"{session.session_name} {original_label} "
+                            f"{segment['start_frame']}-{segment['end_frame']}"
+                        )
                     continue
 
                 annotations.append(annotation)
@@ -626,14 +726,17 @@ def build_annotations(
                 continue
 
             if is_stationary_label(cleaned):
-                annotations.append(
-                    create_stationary_sample(
-                        session=session,
-                        segment=segment,
-                        cleaned_label=cleaned,
-                        sample_index=sample_index,
-                    )
+                annotation, _filter_info = create_stationary_sample(
+                    session=session,
+                    segment=segment,
+                    cleaned_label=cleaned,
+                    sample_index=sample_index,
+                    min_valid_frames=min_valid_frames,
+                    stats=stats,
                 )
+                if annotation is None:
+                    continue
+                annotations.append(annotation)
                 stats.stationary_segments_kept += 1
                 continue
 
@@ -783,6 +886,7 @@ def make_summary(
         "test_subject": test_subject,
         "test_subjects": test_subjects,
         "num_annotations": len(annotations),
+        "samples_created": stats.samples_created,
         "num_train": len(split["train"]),
         "num_val": len(split["val"]),
         "num_calib": len(split.get("calib", [])),
@@ -799,6 +903,25 @@ def make_summary(
         "jsonl_files": stats.jsonl_files,
         "source_segments": stats.source_segments,
         "label_source_counts": dict(stats.label_source_counts),
+        "zero_frame_filter": {
+            "enabled": True,
+            "zero_frame_eps": ZERO_FRAME_EPS,
+            "zero_frame_definition": (
+                "Drop frames whose keypoint coordinates are all zero and, "
+                "when keypoint scores exist, whose keypoint scores are all zero."
+            ),
+            "min_valid_frame_ratio_of_clip_len": MIN_VALID_FRAME_RATIO_AFTER_ZERO_FILTER,
+            "min_valid_frames": stats.zero_frame_filter_min_valid_frames,
+        },
+        "sample_candidates_before_zero_filter": stats.sample_candidates_before_zero_filter,
+        "samples_kept_after_zero_filter": stats.samples_kept_after_zero_filter,
+        "samples_dropped_after_zero_filter": sum(stats.dropped_samples_by_reason.values()),
+        "samples_with_zero_frames_removed": stats.samples_with_zero_frames_removed,
+        "source_frames_before_zero_filter": stats.source_frames_before_zero_filter,
+        "valid_frames_after_zero_filter": stats.valid_frames_after_zero_filter,
+        "zero_frames_removed": stats.zero_frames_removed,
+        "dropped_samples_by_reason": dict(stats.dropped_samples_by_reason),
+        "dropped_samples_by_label": dict(stats.dropped_samples_by_label),
         "dropped_segments_by_reason": dict(stats.dropped_segments_by_reason),
         "dropped_segments_by_label": dict(stats.dropped_segments_by_label),
         "dropped_by_label_cleaning": stats.dropped_segments_by_reason.get("label_cleaning", 0),

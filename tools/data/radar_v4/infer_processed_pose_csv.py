@@ -433,15 +433,30 @@ def window_starts(total_frames: int, window_size: int, stride: int, include_tail
     return starts
 
 
-def make_window(grid: FrameGrid, start: int, window_size: int) -> Window:
+def nonzero_pose_frame_mask(keypoint: np.ndarray, keypoint_score: np.ndarray) -> np.ndarray:
+    import numpy as np
+
+    keypoint_nonzero = np.any(np.abs(keypoint) > 1e-5, axis=(1, 2))
+    score_nonzero = np.any(np.abs(keypoint_score) > 1e-5, axis=1)
+    return np.logical_or(keypoint_nonzero, score_nonzero)
+
+
+def make_window(grid: FrameGrid, start: int, window_size: int, squeeze_zero_frames: bool = False) -> Window:
     import numpy as np
 
     end = min(start + window_size, grid.total_frames)
     actual_len = end - start
-    keypoint = np.zeros((1, window_size, NUM_KEYPOINTS, 2), dtype=np.float32)
-    keypoint_score = np.zeros((1, window_size, NUM_KEYPOINTS), dtype=np.float32)
-    keypoint[0, :actual_len] = grid.keypoint[start:end]
-    keypoint_score[0, :actual_len] = grid.keypoint_score[start:end]
+    if squeeze_zero_frames:
+        source_keypoint = grid.keypoint[start:end]
+        source_keypoint_score = grid.keypoint_score[start:end]
+        keep = nonzero_pose_frame_mask(source_keypoint, source_keypoint_score)
+        keypoint = source_keypoint[keep][None, ...].copy()
+        keypoint_score = source_keypoint_score[keep][None, ...].copy()
+    else:
+        keypoint = np.zeros((1, window_size, NUM_KEYPOINTS, 2), dtype=np.float32)
+        keypoint_score = np.zeros((1, window_size, NUM_KEYPOINTS), dtype=np.float32)
+        keypoint[0, :actual_len] = grid.keypoint[start:end]
+        keypoint_score[0, :actual_len] = grid.keypoint_score[start:end]
     return Window(start=start, end=end, keypoint=keypoint, keypoint_score=keypoint_score)
 
 
@@ -509,6 +524,7 @@ def infer_window_predictions(
     min_valid_frames: int | None,
     include_tail: bool,
     quiet: bool,
+    squeeze_zero_frames: bool = False,
 ) -> tuple[list[WindowPrediction], np.ndarray, int]:
     import mmcv
     import numpy as np
@@ -556,7 +572,12 @@ def infer_window_predictions(
         batch_valid_frames = []
 
     for index, start in enumerate(starts, start=1):
-        window = make_window(grid=grid, start=start, window_size=window_size)
+        window = make_window(
+            grid=grid,
+            start=start,
+            window_size=window_size,
+            squeeze_zero_frames=squeeze_zero_frames,
+        )
         covering_windows[window.start:window.end] += 1
 
         denominator = max(1, window.end - window.start)
@@ -565,8 +586,13 @@ def infer_window_predictions(
             if min_valid_frames is not None
             else math.ceil(min_valid_ratio * denominator)
         )
-        valid_frames = int(np.count_nonzero(grid.selected_detection[window.start:window.end]))
+        if squeeze_zero_frames:
+            valid_frames = int(window.keypoint.shape[1])
+        else:
+            valid_frames = int(np.count_nonzero(grid.selected_detection[window.start:window.end]))
 
+        if squeeze_zero_frames and valid_frames == 0:
+            continue
         if valid_frames >= required:
             batch.append(window)
             batch_valid_frames.append(valid_frames)
@@ -1027,6 +1053,11 @@ def parse_args() -> argparse.Namespace:
         help="Override --min-valid-ratio with an absolute frame count.",
     )
     parser.add_argument(
+        "--squeeze-zero-frames",
+        action="store_true",
+        help="Remove all-zero pose frames inside each accepted model window.",
+    )
+    parser.add_argument(
         "--img-shape",
         nargs=2,
         type=int,
@@ -1133,6 +1164,7 @@ def main() -> None:
         min_valid_frames=args.min_valid_frames,
         include_tail=not args.no_tail_window,
         quiet=args.quiet,
+        squeeze_zero_frames=args.squeeze_zero_frames,
     )
     timeline = build_timeline_scores(
         total_frames=grid.total_frames,

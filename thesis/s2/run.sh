@@ -28,9 +28,10 @@ S2_CLASS_SAMPLE_STRATEGY="${S2_CLASS_SAMPLE_STRATEGY:-sqrt}"
 S2_CLASS_SAMPLE_POWER="${S2_CLASS_SAMPLE_POWER:-0.5}"
 S2_EPOCH_SIZE="${S2_EPOCH_SIZE:-}"
 S2_INCLUDE_WALK_SESSIONS="${S2_INCLUDE_WALK_SESSIONS:-0}"
+S2_MIN_VALID_RATIO="${S2_MIN_VALID_RATIO:-0.5}"
 
 # python thesis/s2/stage1_report.py --overwrite
-BUILD_WINDOW_ARGS=(--folds ${RUN_FOLDS} --overwrite)
+BUILD_WINDOW_ARGS=(--folds ${RUN_FOLDS} --min-valid-ratio "${S2_MIN_VALID_RATIO}" --overwrite)
 if [[ "${S2_INCLUDE_WALK_SESSIONS}" == "1" ]]; then
   BUILD_WINDOW_ARGS+=(--include-walk-sessions)
 else
@@ -67,6 +68,7 @@ python thesis/s2/sanity_check.py \
   --streams ${RUN_STREAMS} \
   --expected-class-sample-strategy "${S2_CLASS_SAMPLE_STRATEGY}" \
   --expected-class-sample-power "${S2_CLASS_SAMPLE_POWER}" \
+  --skip-prediction-checks \
   --overwrite
 
 for stream in ${RUN_STREAMS}; do

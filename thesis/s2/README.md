@@ -10,6 +10,13 @@ Default protocol:
 - Stride: `10` frames
 - Center frame: `start + 30`
 - No tail windows and no temporal zero padding
+- All-zero pose frames are removed from the saved model tensor after a candidate
+  source window is accepted on the original timeline. The original
+  `start_frame`, `end_frame`, `center_frame`, timestamps, and 60-frame
+  per-frame label timeline are preserved, and retained source frames are stored
+  in `source_frame_indices`.
+- Default retained-pose threshold: at least `30` nonzero pose frames from the
+  60-frame source window (`--min-valid-ratio 0.5`)
 - Default recording scope: non-walk JSONL recordings under
   `data/radar_v4/raw_jsonl/yolo26xpose`; walk-only sessions ending in
   `-walk` are excluded from both training and evaluation
@@ -20,10 +27,10 @@ Prepare S2 artifacts:
 
 ```bash
 python thesis/s2/stage1_report.py --overwrite
-python thesis/s2/build_continuous_windows.py --overwrite
+python thesis/s2/build_continuous_windows.py --min-valid-ratio 0.5 --overwrite
 python thesis/s2/generate_configs.py --overwrite
 python thesis/s2/class_sampling_report.py --overwrite
-python thesis/s2/sanity_check.py --overwrite
+python thesis/s2/sanity_check.py --skip-prediction-checks --overwrite
 ```
 
 The generated configs default to `videos_per_gpu=8`, `workers_per_gpu=1`,

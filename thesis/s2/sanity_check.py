@@ -17,8 +17,10 @@ try:
         DEFAULT_OUTPUT_DIR,
         DEFAULT_S2_PKL,
         LABELS,
+        MIN_VALID_FRAMES_AFTER_ZERO_FILTER,
         STRIDE,
         WINDOW_SIZE,
+        ZERO_FRAME_EPS,
         default_prediction_path,
         discover_s2_folds,
         eta_slug,
@@ -34,8 +36,10 @@ except ImportError:
         DEFAULT_OUTPUT_DIR,
         DEFAULT_S2_PKL,
         LABELS,
+        MIN_VALID_FRAMES_AFTER_ZERO_FILTER,
         STRIDE,
         WINDOW_SIZE,
+        ZERO_FRAME_EPS,
         default_prediction_path,
         discover_s2_folds,
         eta_slug,
@@ -104,13 +108,24 @@ def check_pkl_windows(path: Path, etas: tuple[float, ...]) -> list[dict[str, Any
 
     for index, item in enumerate(annotations):
         if int(item["end_frame"]) - int(item["start_frame"]) + 1 != WINDOW_SIZE:
-            failures.append({"index": index, "reason": "window_length", "frame_dir": item["frame_dir"]})
+            failures.append({"index": index, "reason": "source_window_length", "frame_dir": item["frame_dir"]})
         if int(item["center_frame"]) != int(item["start_frame"]) + CENTER_OFFSET:
             failures.append({"index": index, "reason": "center_frame", "frame_dir": item["frame_dir"]})
-        if int(item["total_frames"]) != WINDOW_SIZE:
-            failures.append({"index": index, "reason": "total_frames", "frame_dir": item["frame_dir"]})
-        if item["keypoint"].shape[1] != WINDOW_SIZE:
+        total_frames = int(item["total_frames"])
+        keypoint = item["keypoint"]
+        keypoint_score = item["keypoint_score"]
+        if total_frames < MIN_VALID_FRAMES_AFTER_ZERO_FILTER:
+            failures.append({"index": index, "reason": "total_frames_below_min_valid", "frame_dir": item["frame_dir"]})
+        if keypoint.shape[1] != total_frames:
             failures.append({"index": index, "reason": "keypoint_shape", "frame_dir": item["frame_dir"]})
+        if keypoint_score.shape[1] != total_frames:
+            failures.append({"index": index, "reason": "keypoint_score_shape", "frame_dir": item["frame_dir"]})
+        keypoint_nonzero = np.any(np.abs(keypoint[0]) > ZERO_FRAME_EPS, axis=(1, 2))
+        score_nonzero = np.any(np.abs(keypoint_score[0]) > ZERO_FRAME_EPS, axis=1)
+        if not np.all(np.logical_or(keypoint_nonzero, score_nonzero)):
+            failures.append({"index": index, "reason": "zero_pose_frame_retained", "frame_dir": item["frame_dir"]})
+        if len(item.get("source_frame_indices", [])) != total_frames:
+            failures.append({"index": index, "reason": "source_frame_indices_length", "frame_dir": item["frame_dir"]})
         center_label = int(item["per_frame_label_ids"][CENTER_OFFSET])
         if center_label != int(item["hard_label"]):
             failures.append({"index": index, "reason": "center_label", "frame_dir": item["frame_dir"]})
@@ -157,8 +172,12 @@ def check_pkl_windows(path: Path, etas: tuple[float, ...]) -> list[dict[str, Any
     return [
         assert_or_record(
             not failures,
-            "Continuous windows use 60 frames, no padding, and valid center labels",
-            {"num_annotations": len(annotations), "failures": failures[:10]},
+            "Continuous windows use 60-frame source windows, filtered nonzero pose tensors, and valid center labels",
+            {
+                "num_annotations": len(annotations),
+                "min_valid_frames": MIN_VALID_FRAMES_AFTER_ZERO_FILTER,
+                "failures": failures[:10],
+            },
         ),
         assert_or_record(
             not split_failures,
@@ -332,13 +351,44 @@ def recording_scope_for_pkl(path: Path) -> str | None:
     return None
 
 
+def zero_frame_filter_enabled_for_pkl(path: Path) -> bool:
+    summary_path = path.with_name(f"{path.stem}_summary.json")
+    if summary_path.exists():
+        summary = read_json(summary_path)
+        zero_filter = summary.get("zero_frame_filter", {})
+        if isinstance(zero_filter, dict):
+            return bool(zero_filter.get("enabled"))
+        protocol = summary.get("protocol", {})
+        if isinstance(protocol, dict):
+            protocol_filter = protocol.get("zero_frame_filter", {})
+            if isinstance(protocol_filter, dict):
+                return bool(protocol_filter.get("enabled"))
+    if path.exists():
+        data = load_pkl(path)
+        protocol = data.get("protocol", {}) if isinstance(data, dict) else {}
+        zero_filter = protocol.get("zero_frame_filter", {}) if isinstance(protocol, dict) else {}
+        if isinstance(zero_filter, dict):
+            return bool(zero_filter.get("enabled"))
+    return False
+
+
 def check_e2_reproduction(
     stream: str,
     s2_metrics: Path,
     e2_summary: Path,
     tolerance: float,
     recording_scope: str | None,
+    zero_frame_filter_enabled: bool,
 ) -> dict[str, Any]:
+    if zero_frame_filter_enabled:
+        return skip_record(
+            "Baseline A reproduces E2 center metrics",
+            (
+                "S2 now removes all-zero pose frames and drops sparse source "
+                "windows, so its center-time window set is intentionally not "
+                "the legacy E2 window set."
+            ),
+        )
     if recording_scope and "non-walk" not in recording_scope.lower():
         return skip_record(
             "Baseline A reproduces E2 center metrics",
@@ -393,6 +443,16 @@ def parse_args() -> argparse.Namespace:
         default=Path("work_dirs/thesis/e2/eval/e2_joint_scores_summary.csv"),
     )
     parser.add_argument("--e2-tolerance", type=float, default=1e-6)
+    parser.add_argument(
+        "--skip-prediction-checks",
+        action="store_true",
+        help="Skip checks that require regenerated A/B/C prediction CSVs.",
+    )
+    parser.add_argument(
+        "--skip-e2-reproduction",
+        action="store_true",
+        help="Skip the legacy E2 reproduction comparison.",
+    )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_DIR / "sanity_checks.json")
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
@@ -402,6 +462,7 @@ def main() -> None:
     args = parse_args()
     folds = filter_folds(args.folds)
     recording_scope = recording_scope_for_pkl(args.pkl)
+    zero_frame_filter_enabled = zero_frame_filter_enabled_for_pkl(args.pkl)
     checks = [check_subject_splits()]
     checks.extend(check_pkl_windows(args.pkl, tuple(args.etas)))
     checks.append(
@@ -414,16 +475,33 @@ def main() -> None:
         )
     )
     checks.append(check_eta_zero_loss())
-    checks.append(check_prediction_alignment(args.stream))
-    checks.append(
-        check_e2_reproduction(
-            args.stream,
-            args.s2_a_metrics,
-            args.e2_summary,
-            args.e2_tolerance,
-            recording_scope,
+    if args.skip_prediction_checks:
+        checks.append(
+            skip_record(
+                "A/B/C methods use exactly the same test windows",
+                "skipped by --skip-prediction-checks",
+            )
         )
-    )
+    else:
+        checks.append(check_prediction_alignment(args.stream))
+    if args.skip_e2_reproduction:
+        checks.append(
+            skip_record(
+                "Baseline A reproduces E2 center metrics",
+                "skipped by --skip-e2-reproduction",
+            )
+        )
+    else:
+        checks.append(
+            check_e2_reproduction(
+                args.stream,
+                args.s2_a_metrics,
+                args.e2_summary,
+                args.e2_tolerance,
+                recording_scope,
+                zero_frame_filter_enabled,
+            )
+        )
     checks.append(pass_record("Segmental metrics reset at each recording boundary", {"grouping": ["fold", "recording_id"]}))
     checks.append(pass_record("Test split is not used for Stage-2 checkpoint or eta selection", {"selection_split": "val"}))
 

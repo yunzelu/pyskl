@@ -53,22 +53,22 @@ train_split = 'fold_a_train'
 val_split = 'fold_a_val'
 test_split = 'fold_a_test'
 # Stage-2 training samples are drawn each epoch from pre-gridded train windows.
-# class_sample_strategy: sqrt; class_sample_power: 0.5; epoch_size: 55624
+# class_sample_strategy: sqrt; class_sample_power: 0.5; epoch_size: 52806
 # Class draw rule: P(c) = n_c ** class_sample_power / sum_j n_j ** class_sample_power.
 # After drawing a class, one pre-gridded window from that class is sampled uniformly with replacement.
 # Train window counts and expected draws per epoch:
-# Falling: n=1705, p=0.066695, expected_epoch_samples=3709.8
-# Lying-Stationary: n=9915, p=0.160834, expected_epoch_samples=8946.2
-# Sit-Stationary: n=5467, p=0.119428, expected_epoch_samples=6643.0
-# Transition-LayBed-to-Sit: n=2079, p=0.073647, expected_epoch_samples=4096.6
-# Transition-LayFloor-to-Stand: n=4188, p=0.104528, expected_epoch_samples=5814.3
-# Transition-Sit-to-LayBed: n=1853, p=0.069529, expected_epoch_samples=3867.5
-# Transition-Sit-to-Stand: n=1709, p=0.066773, expected_epoch_samples=3714.2
-# Transition-Stand-to-Sit: n=2186, p=0.075519, expected_epoch_samples=4200.7
-# Walking: n=26522, p=0.263047, expected_epoch_samples=14631.7
+# Falling: n=1702, p=0.067629, expected_epoch_samples=3571.2
+# Lying-Stationary: n=9819, p=0.162439, expected_epoch_samples=8577.7
+# Sit-Stationary: n=5467, p=0.121208, expected_epoch_samples=6400.5
+# Transition-LayBed-to-Sit: n=2079, p=0.074745, expected_epoch_samples=3947.0
+# Transition-LayFloor-to-Stand: n=4188, p=0.106086, expected_epoch_samples=5602.0
+# Transition-Sit-to-LayBed: n=1853, p=0.070566, expected_epoch_samples=3726.3
+# Transition-Sit-to-Stand: n=1709, p=0.067768, expected_epoch_samples=3578.6
+# Transition-Stand-to-Sit: n=2186, p=0.076645, expected_epoch_samples=4047.3
+# Walking: n=23803, p=0.252914, expected_epoch_samples=13355.4
 class_sample_strategy = 'sqrt'
 class_sample_power = 0.5
-epoch_size = 55624
+epoch_size = 52806
 
 generate_pose_target = dict(
     joint=dict(with_kp=True, with_limb=False),

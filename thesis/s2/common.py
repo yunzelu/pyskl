@@ -56,6 +56,9 @@ METHOD_B = "B"
 METHOD_C = "C"
 METHODS = (METHOD_A, METHOD_B, METHOD_C)
 DEFAULT_ETAS = (0.25, 0.50, 0.75)
+ZERO_FRAME_EPS = 1e-5
+MIN_VALID_FRAME_RATIO_AFTER_ZERO_FILTER = 0.5
+MIN_VALID_FRAMES_AFTER_ZERO_FILTER = int(np.ceil(WINDOW_SIZE * MIN_VALID_FRAME_RATIO_AFTER_ZERO_FILTER))
 
 
 @dataclass(frozen=True)
@@ -99,6 +102,17 @@ def protocol_metadata(recording_scope: str | None = None) -> dict[str, Any]:
         "center_convention": "center_frame = start_frame + window_size // 2",
         "tail_window": False,
         "temporal_padding": False,
+        "zero_frame_filter": {
+            "enabled": True,
+            "zero_frame_eps": ZERO_FRAME_EPS,
+            "min_valid_frame_ratio_of_window_size": MIN_VALID_FRAME_RATIO_AFTER_ZERO_FILTER,
+            "min_valid_frames": MIN_VALID_FRAMES_AFTER_ZERO_FILTER,
+            "timeline_policy": (
+                "Window centers, labels, timestamps, and start/end frames stay on the "
+                "original source timeline; only all-zero pose frames are removed from "
+                "the saved skeleton tensor."
+            ),
+        },
         "default_recording_scope": recording_scope,
         "segmental_metric_resolution_seconds": STRIDE / FPS,
         "model_selection": {
@@ -381,9 +395,12 @@ __all__ = [
     "METHOD_B",
     "METHOD_C",
     "METHODS",
+    "MIN_VALID_FRAMES_AFTER_ZERO_FILTER",
+    "MIN_VALID_FRAME_RATIO_AFTER_ZERO_FILTER",
     "S2FoldSpec",
     "STRIDE",
     "WINDOW_SIZE",
+    "ZERO_FRAME_EPS",
     "clean_group",
     "clean_label",
     "default_confusion_path",

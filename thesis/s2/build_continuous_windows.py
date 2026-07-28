@@ -24,9 +24,12 @@ try:
         FPS,
         LABELS,
         LABEL_TO_ID,
+        MIN_VALID_FRAMES_AFTER_ZERO_FILTER,
+        MIN_VALID_FRAME_RATIO_AFTER_ZERO_FILTER,
         STRIDE,
         WINDOW_SIZE,
         S2FoldSpec,
+        ZERO_FRAME_EPS,
         clean_group,
         clean_label,
         discover_s2_folds,
@@ -45,9 +48,12 @@ except ImportError:
         FPS,
         LABELS,
         LABEL_TO_ID,
+        MIN_VALID_FRAMES_AFTER_ZERO_FILTER,
+        MIN_VALID_FRAME_RATIO_AFTER_ZERO_FILTER,
         STRIDE,
         WINDOW_SIZE,
         S2FoldSpec,
+        ZERO_FRAME_EPS,
         clean_group,
         clean_label,
         discover_s2_folds,
@@ -92,6 +98,11 @@ class BuildStats:
     jsonl_files_used: int = 0
     walk_sessions_skipped: int = 0
     windows_created: int = 0
+    window_candidates_before_zero_filter: int = 0
+    windows_with_zero_frames_removed: int = 0
+    source_frames_before_zero_filter: int = 0
+    valid_frames_after_zero_filter: int = 0
+    zero_frames_removed: int = 0
     dropped_windows_by_reason: Counter = field(default_factory=Counter)
     label_source_counts: Counter = field(default_factory=Counter)
     label_mismatches: list[dict[str, Any]] = field(default_factory=list)
@@ -326,6 +337,23 @@ def has_large_timestamp_gap(timestamps: np.ndarray, start: int, end: int, max_ga
     return bool(np.any(finite & (diffs > max_gap_sec)))
 
 
+def nonzero_pose_frame_mask(
+    keypoint: np.ndarray,
+    keypoint_score: np.ndarray,
+) -> np.ndarray:
+    if keypoint.ndim != 3:
+        raise ValueError(f"Expected keypoint shape [T,V,C], got {keypoint.shape}")
+    if keypoint_score.ndim != 2 or keypoint_score.shape[0] != keypoint.shape[0]:
+        raise ValueError(
+            "keypoint_score must have shape [T,V] and match keypoint frames; "
+            f"got keypoint={keypoint.shape}, keypoint_score={keypoint_score.shape}"
+        )
+
+    keypoint_nonzero = np.any(np.abs(keypoint) > ZERO_FRAME_EPS, axis=(1, 2))
+    score_nonzero = np.any(np.abs(keypoint_score) > ZERO_FRAME_EPS, axis=1)
+    return np.logical_or(keypoint_nonzero, score_nonzero)
+
+
 def temporal_distribution(
     session: ContinuousSession,
     start: int,
@@ -390,9 +418,18 @@ def build_annotation(
         f"__s{start:06d}_e{end:06d}_c{center:06d}"
     )
 
-    keypoint = session.keypoint[start:end + 1][None, ...].copy()
-    keypoint_score = session.keypoint_score[start:end + 1][None, ...].copy()
+    source_keypoint = session.keypoint[start:end + 1]
+    source_keypoint_score = session.keypoint_score[start:end + 1]
+    valid_pose_mask = nonzero_pose_frame_mask(source_keypoint, source_keypoint_score)
+    source_frame_indices = np.arange(start, end + 1, dtype=np.int32)
+    retained_frame_indices = source_frame_indices[valid_pose_mask]
+    if retained_frame_indices.size == 0:
+        raise ValueError(f"Window {frame_dir} has no nonzero pose frames")
+
+    keypoint = source_keypoint[valid_pose_mask][None, ...].copy()
+    keypoint_score = source_keypoint_score[valid_pose_mask][None, ...].copy()
     per_frame_label_ids = session.clean_label_ids[start:end + 1].copy()
+    retained_frame_label_ids = session.clean_label_ids[start:end + 1][valid_pose_mask].copy()
 
     return {
         "frame_dir": frame_dir,
@@ -414,14 +451,18 @@ def build_annotation(
         "center_frame": center,
         "center_timestamp": float(session.timestamps[center]),
         "source_total_frames": session.total_frames,
-        "valid_detection_frames": int(np.count_nonzero(session.selected_detection[start:end + 1])),
+        "source_window_size": window_size,
+        "source_frame_indices": np.ascontiguousarray(retained_frame_indices),
+        "valid_detection_frames": int(retained_frame_indices.size),
+        "zero_frames_removed": int(window_size - retained_frame_indices.size),
         "selected_detection_center": bool(session.selected_detection[center]),
-        "total_frames": window_size,
+        "total_frames": int(retained_frame_indices.size),
         "img_shape": session.img_shape,
         "original_shape": session.img_shape,
         "keypoint": np.ascontiguousarray(keypoint),
         "keypoint_score": np.ascontiguousarray(keypoint_score),
         "per_frame_label_ids": np.ascontiguousarray(per_frame_label_ids),
+        "retained_frame_label_ids": np.ascontiguousarray(retained_frame_label_ids),
         "q_temporal": q_temporal,
         **targets,
     }
@@ -430,6 +471,9 @@ def build_annotation(
 def manifest_row(fold: str, split: str, annotation: dict[str, Any], output_pkl: Path) -> dict[str, Any]:
     label_ids = [int(value) for value in annotation["per_frame_label_ids"].tolist()]
     labels = [LABELS[value] if value >= 0 else "" for value in label_ids]
+    retained_label_ids = [int(value) for value in annotation["retained_frame_label_ids"].tolist()]
+    retained_labels = [LABELS[value] if value >= 0 else "" for value in retained_label_ids]
+    retained_source_frames = [int(value) for value in annotation["source_frame_indices"].tolist()]
     row: dict[str, Any] = {
         "fold": fold,
         "split": split,
@@ -444,15 +488,20 @@ def manifest_row(fold: str, split: str, annotation: dict[str, Any], output_pkl: 
         "manual_center_label_id": annotation["hard_label"],
         "raw_center_label": annotation["raw_center_label"],
         "gt_group": annotation["gt_group"],
+        "source_window_size": annotation["source_window_size"],
         "valid_detection_frames": annotation["valid_detection_frames"],
+        "zero_frames_removed": annotation["zero_frames_removed"],
         "selected_detection_center": int(annotation["selected_detection_center"]),
         "label_source": annotation["label_source"],
         "jsonl_path": annotation["jsonl_path"],
         "pkl_path": str(output_pkl),
         "keypoint_shape": json_dumps_compact(list(annotation["keypoint"].shape)),
         "keypoint_score_shape": json_dumps_compact(list(annotation["keypoint_score"].shape)),
+        "source_frame_indices": json_dumps_compact(retained_source_frames),
         "per_frame_label_ids": json_dumps_compact(label_ids),
         "per_frame_labels": json_dumps_compact(labels),
+        "retained_frame_label_ids": json_dumps_compact(retained_label_ids),
+        "retained_frame_labels": json_dumps_compact(retained_labels),
         "q_temporal": json_dumps_compact([float(x) for x in annotation["q_temporal"]]),
     }
     for key, value in annotation.items():
@@ -581,7 +630,17 @@ def build_continuous_dataset(
                 stats.dropped_windows_by_reason["center_segment_label_mismatch"] += 1
                 continue
 
-            valid_detection_frames = int(np.count_nonzero(session.selected_detection[start:end + 1]))
+            source_keypoint = session.keypoint[start:end + 1]
+            source_keypoint_score = session.keypoint_score[start:end + 1]
+            valid_pose_mask = nonzero_pose_frame_mask(source_keypoint, source_keypoint_score)
+            valid_detection_frames = int(np.count_nonzero(valid_pose_mask))
+            zero_frames_removed = int(WINDOW_SIZE - valid_detection_frames)
+            stats.window_candidates_before_zero_filter += 1
+            stats.source_frames_before_zero_filter += WINDOW_SIZE
+            stats.valid_frames_after_zero_filter += valid_detection_frames
+            stats.zero_frames_removed += zero_frames_removed
+            if zero_frames_removed > 0:
+                stats.windows_with_zero_frames_removed += 1
             if valid_detection_frames < required_valid_frames:
                 stats.dropped_windows_by_reason["missing_skeleton_threshold"] += 1
                 continue
@@ -672,15 +731,20 @@ def build_continuous_dataset(
         "manual_center_label_id",
         "raw_center_label",
         "gt_group",
+        "source_window_size",
         "valid_detection_frames",
+        "zero_frames_removed",
         "selected_detection_center",
         "label_source",
         "jsonl_path",
         "pkl_path",
         "keypoint_shape",
         "keypoint_score_shape",
+        "source_frame_indices",
         "per_frame_label_ids",
         "per_frame_labels",
+        "retained_frame_label_ids",
+        "retained_frame_labels",
         "q_temporal",
         *[f"target_probs_{eta_slug(eta)}" for eta in etas],
     ]
@@ -715,13 +779,37 @@ def build_continuous_dataset(
         "recording_scope": recording_scope,
         "min_valid_ratio": min_valid_ratio,
         "min_valid_frames": min_valid_frames,
+        "effective_min_valid_frames": (
+            min_valid_frames
+            if min_valid_frames is not None
+            else math.ceil(min_valid_ratio * WINDOW_SIZE)
+        ),
         "max_timestamp_gap_sec": max_timestamp_gap_sec,
+        "zero_frame_filter": {
+            "enabled": True,
+            "zero_frame_eps": ZERO_FRAME_EPS,
+            "zero_frame_definition": (
+                "Drop frames whose keypoint coordinates and keypoint scores are all zero. "
+                "Window centers, labels, timestamps, and start/end frames stay on the original timeline."
+            ),
+            "min_valid_frame_ratio_of_window_size": min_valid_ratio,
+            "min_valid_frames": (
+                min_valid_frames
+                if min_valid_frames is not None
+                else math.ceil(min_valid_ratio * WINDOW_SIZE)
+            ),
+        },
         "label_source": label_source,
         "split_subjects": split_subjects,
         "split_counts": split_counts,
         "samples_per_subject": dict(sorted(subject_counts.items())),
         "samples_per_recording": dict(sorted(session_counts.items())),
         "samples_per_class": {label: int(label_counts.get(label, 0)) for label in LABELS},
+        "window_candidates_before_zero_filter": stats.window_candidates_before_zero_filter,
+        "windows_with_zero_frames_removed": stats.windows_with_zero_frames_removed,
+        "source_frames_before_zero_filter": stats.source_frames_before_zero_filter,
+        "valid_frames_after_zero_filter": stats.valid_frames_after_zero_filter,
+        "zero_frames_removed": stats.zero_frames_removed,
         "jsonl_files_seen": stats.jsonl_files_seen,
         "jsonl_files_used": stats.jsonl_files_used,
         "walk_sessions_skipped": stats.walk_sessions_skipped,
@@ -742,7 +830,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--manifest-dir", type=Path, default=DEFAULT_PKL_DIR)
     parser.add_argument("--folds", nargs="+", help="Fold ids to include, e.g. a b c. Default: all discovered folds.")
     parser.add_argument("--etas", nargs="+", type=float, default=list(DEFAULT_ETAS))
-    parser.add_argument("--min-valid-ratio", type=float, default=0.0)
+    parser.add_argument("--min-valid-ratio", type=float, default=MIN_VALID_FRAME_RATIO_AFTER_ZERO_FILTER)
     parser.add_argument("--min-valid-frames", type=int)
     parser.add_argument(
         "--max-timestamp-gap-sec",

@@ -49,14 +49,14 @@ right_limb = [1, 4, 5, 9, 10, 11, 13, 15]
 # Test subject: jiadi
 # Train counts:
 # Falling: 469
-# Lying-Stationary: 912
-# Sit-Stationary: 478
+# Lying-Stationary: 891
+# Sit-Stationary: 474
 # Transition-LayBed-to-Sit: 452
 # Transition-LayFloor-to-Stand: 458
 # Transition-Sit-to-LayBed: 453
 # Transition-Sit-to-Stand: 913
 # Transition-Stand-to-Sit: 915
-# Walking: 1539
+# Walking: 1511
 class_prob = [2.0, 1.0, 2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0]
 
 generate_pose_target = dict(

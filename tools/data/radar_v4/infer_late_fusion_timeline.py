@@ -261,6 +261,7 @@ def infer_fused_window_predictions(
     normalize_weights: bool,
     score_output: str,
     quiet: bool,
+    squeeze_zero_frames: bool = False,
 ) -> tuple[list[WindowPrediction], "np.ndarray", int]:
     import numpy as np
 
@@ -307,7 +308,12 @@ def infer_fused_window_predictions(
         batch_valid_frames = []
 
     for index, start in enumerate(starts, start=1):
-        window = make_window(grid=grid, start=start, window_size=window_size)
+        window = make_window(
+            grid=grid,
+            start=start,
+            window_size=window_size,
+            squeeze_zero_frames=squeeze_zero_frames,
+        )
         covering_windows[window.start:window.end] += 1
 
         denominator = max(1, window.end - window.start)
@@ -316,8 +322,13 @@ def infer_fused_window_predictions(
             if min_valid_frames is not None
             else math.ceil(min_valid_ratio * denominator)
         )
-        valid_frames = int(np.count_nonzero(grid.selected_detection[window.start:window.end]))
+        if squeeze_zero_frames:
+            valid_frames = int(window.keypoint.shape[1])
+        else:
+            valid_frames = int(np.count_nonzero(grid.selected_detection[window.start:window.end]))
 
+        if squeeze_zero_frames and valid_frames == 0:
+            continue
         if valid_frames >= required:
             batch.append(window)
             batch_valid_frames.append(valid_frames)
@@ -551,6 +562,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-valid-ratio", type=float, default=0.5)
     parser.add_argument("--min-valid-frames", type=int)
     parser.add_argument(
+        "--squeeze-zero-frames",
+        action="store_true",
+        help="Remove all-zero pose frames inside each accepted model window.",
+    )
+    parser.add_argument(
         "--no-tail-window",
         action="store_true",
         help="Do not add a final tail window when stride misses the final full window.",
@@ -637,6 +653,7 @@ def main() -> None:
         normalize_weights=not args.no_normalize_weights,
         score_output=args.score_output,
         quiet=args.quiet,
+        squeeze_zero_frames=args.squeeze_zero_frames,
     )
     timeline = build_timeline_scores(
         total_frames=grid.total_frames,
