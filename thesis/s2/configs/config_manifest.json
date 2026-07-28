@@ -1,13 +1,10 @@
 {
-  "ann_file": "data\\radar_v4\\pyskl\\s2\\radarv4_yolo26xpose_clip60_s2_continuous.pkl",
+  "ann_file": "data/radar_v4/pyskl/s2/radarv4_yolo26xpose_clip60_s2_continuous.pkl",
   "folds": [
-    "a",
-    "b",
-    "c"
+    "a"
   ],
   "streams": [
-    "joint",
-    "limb"
+    "joint"
   ],
   "etas": [
     0.25,
@@ -32,28 +29,6 @@
       1709,
       2186,
       26522
-    ],
-    "b": [
-      1906,
-      9026,
-      5360,
-      2162,
-      4710,
-      1982,
-      1900,
-      2404,
-      28191
-    ],
-    "c": [
-      1678,
-      10982,
-      4881,
-      2190,
-      4739,
-      1804,
-      1783,
-      2049,
-      25932
     ]
   },
   "class_probs_by_fold": {
@@ -66,28 +41,6 @@
       3.3353720693170232,
       3.6164098563162344,
       2.8272847412829116,
-      1.0
-    ],
-    "b": [
-      3.3602075317710156,
-      1.0,
-      1.1948797678275291,
-      2.962329119128379,
-      1.3597782495871669,
-      3.231360017939231,
-      3.3708187134502925,
-      2.6641246071362543,
-      1.0
-    ],
-    "c": [
-      3.710634353065819,
-      1.0,
-      1.2756493432584397,
-      2.8431253170979196,
-      1.3138730627652342,
-      3.4514658782951466,
-      3.492116906586901,
-      3.0387723008513636,
       1.0
     ]
   },
@@ -104,40 +57,15 @@
   ],
   "configs": {
     "A": [
-      "thesis\\s2\\configs\\fold_a\\joint\\posec3d_trimmed_baseline_A.py",
-      "thesis\\s2\\configs\\fold_a\\limb\\posec3d_trimmed_baseline_A.py",
-      "thesis\\s2\\configs\\fold_b\\joint\\posec3d_trimmed_baseline_A.py",
-      "thesis\\s2\\configs\\fold_b\\limb\\posec3d_trimmed_baseline_A.py",
-      "thesis\\s2\\configs\\fold_c\\joint\\posec3d_trimmed_baseline_A.py",
-      "thesis\\s2\\configs\\fold_c\\limb\\posec3d_trimmed_baseline_A.py"
+      "thesis/s2/configs/fold_a/joint/posec3d_trimmed_baseline_A.py"
     ],
     "B": [
-      "thesis\\s2\\configs\\fold_a\\joint\\posec3d_continuous_hard_B.py",
-      "thesis\\s2\\configs\\fold_a\\limb\\posec3d_continuous_hard_B.py",
-      "thesis\\s2\\configs\\fold_b\\joint\\posec3d_continuous_hard_B.py",
-      "thesis\\s2\\configs\\fold_b\\limb\\posec3d_continuous_hard_B.py",
-      "thesis\\s2\\configs\\fold_c\\joint\\posec3d_continuous_hard_B.py",
-      "thesis\\s2\\configs\\fold_c\\limb\\posec3d_continuous_hard_B.py"
+      "thesis/s2/configs/fold_a/joint/posec3d_continuous_hard_B.py"
     ],
     "C": [
-      "thesis\\s2\\configs\\fold_a\\joint\\posec3d_continuous_soft_C_eta025.py",
-      "thesis\\s2\\configs\\fold_a\\joint\\posec3d_continuous_soft_C_eta050.py",
-      "thesis\\s2\\configs\\fold_a\\joint\\posec3d_continuous_soft_C_eta075.py",
-      "thesis\\s2\\configs\\fold_a\\limb\\posec3d_continuous_soft_C_eta025.py",
-      "thesis\\s2\\configs\\fold_a\\limb\\posec3d_continuous_soft_C_eta050.py",
-      "thesis\\s2\\configs\\fold_a\\limb\\posec3d_continuous_soft_C_eta075.py",
-      "thesis\\s2\\configs\\fold_b\\joint\\posec3d_continuous_soft_C_eta025.py",
-      "thesis\\s2\\configs\\fold_b\\joint\\posec3d_continuous_soft_C_eta050.py",
-      "thesis\\s2\\configs\\fold_b\\joint\\posec3d_continuous_soft_C_eta075.py",
-      "thesis\\s2\\configs\\fold_b\\limb\\posec3d_continuous_soft_C_eta025.py",
-      "thesis\\s2\\configs\\fold_b\\limb\\posec3d_continuous_soft_C_eta050.py",
-      "thesis\\s2\\configs\\fold_b\\limb\\posec3d_continuous_soft_C_eta075.py",
-      "thesis\\s2\\configs\\fold_c\\joint\\posec3d_continuous_soft_C_eta025.py",
-      "thesis\\s2\\configs\\fold_c\\joint\\posec3d_continuous_soft_C_eta050.py",
-      "thesis\\s2\\configs\\fold_c\\joint\\posec3d_continuous_soft_C_eta075.py",
-      "thesis\\s2\\configs\\fold_c\\limb\\posec3d_continuous_soft_C_eta025.py",
-      "thesis\\s2\\configs\\fold_c\\limb\\posec3d_continuous_soft_C_eta050.py",
-      "thesis\\s2\\configs\\fold_c\\limb\\posec3d_continuous_soft_C_eta075.py"
+      "thesis/s2/configs/fold_a/joint/posec3d_continuous_soft_C_eta025.py",
+      "thesis/s2/configs/fold_a/joint/posec3d_continuous_soft_C_eta050.py",
+      "thesis/s2/configs/fold_a/joint/posec3d_continuous_soft_C_eta075.py"
     ]
   }
 }

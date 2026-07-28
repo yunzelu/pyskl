@@ -18,7 +18,7 @@ cd ~/projects/def-mbolic/yunzelu/pyskl/
 
 GPUS="${GPUS:-4}"
 SEED="${SEED:-42}"
-RUN_FOLDS="${RUN_FOLDS:-a}"
+RUN_FOLDS="${RUN_FOLDS:-b}"
 RUN_STREAMS="${RUN_STREAMS:-joint}"
 RUN_METHODS="${RUN_METHODS:-A B C050}"
 RUN_EXTRA_C_ETAS="${RUN_EXTRA_C_ETAS:-0}"
