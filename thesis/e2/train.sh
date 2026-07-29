@@ -3,7 +3,7 @@
 #SBATCH --gpus-per-node=a100:4
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=62G
-#SBATCH --time=08:00:00
+#SBATCH --time=10:00:00
 #SBATCH --job-name=e2_posec3d_8111
 #SBATCH --output=thesis/e2/%x_%j.out
 #SBATCH --mail-user=yunzelu@outlook.com
