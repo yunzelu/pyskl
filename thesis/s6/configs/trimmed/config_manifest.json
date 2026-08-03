@@ -1,0 +1,73 @@
+{
+  "stage": "s6_trimmed_teacher_configs",
+  "pkl_dir": "data\\radar_v4\\pyskl\\8111teacher4_s6",
+  "output_dir": "thesis\\s6\\configs\\trimmed",
+  "folds": [
+    "a",
+    "b",
+    "c"
+  ],
+  "teachers": [
+    "t1",
+    "t2",
+    "t3",
+    "t4"
+  ],
+  "streams": [
+    "joint",
+    "limb"
+  ],
+  "total_epochs": 20,
+  "lr": 0.2,
+  "videos_per_gpu": 32,
+  "workers_per_gpu": 4,
+  "test_videos_per_gpu": 1,
+  "class_prob": [
+    2.0,
+    1.0,
+    2.0,
+    2.0,
+    2.0,
+    2.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "labels": [
+    "Falling",
+    "Lying-Stationary",
+    "Sit-Stationary",
+    "Transition-LayBed-to-Sit",
+    "Transition-LayFloor-to-Stand",
+    "Transition-Sit-to-LayBed",
+    "Transition-Sit-to-Stand",
+    "Transition-Stand-to-Sit",
+    "Walking"
+  ],
+  "configs": [
+    "thesis\\s6\\configs\\trimmed\\fold_a\\t1\\joint.py",
+    "thesis\\s6\\configs\\trimmed\\fold_a\\t1\\limb.py",
+    "thesis\\s6\\configs\\trimmed\\fold_a\\t2\\joint.py",
+    "thesis\\s6\\configs\\trimmed\\fold_a\\t2\\limb.py",
+    "thesis\\s6\\configs\\trimmed\\fold_a\\t3\\joint.py",
+    "thesis\\s6\\configs\\trimmed\\fold_a\\t3\\limb.py",
+    "thesis\\s6\\configs\\trimmed\\fold_a\\t4\\joint.py",
+    "thesis\\s6\\configs\\trimmed\\fold_a\\t4\\limb.py",
+    "thesis\\s6\\configs\\trimmed\\fold_b\\t1\\joint.py",
+    "thesis\\s6\\configs\\trimmed\\fold_b\\t1\\limb.py",
+    "thesis\\s6\\configs\\trimmed\\fold_b\\t2\\joint.py",
+    "thesis\\s6\\configs\\trimmed\\fold_b\\t2\\limb.py",
+    "thesis\\s6\\configs\\trimmed\\fold_b\\t3\\joint.py",
+    "thesis\\s6\\configs\\trimmed\\fold_b\\t3\\limb.py",
+    "thesis\\s6\\configs\\trimmed\\fold_b\\t4\\joint.py",
+    "thesis\\s6\\configs\\trimmed\\fold_b\\t4\\limb.py",
+    "thesis\\s6\\configs\\trimmed\\fold_c\\t1\\joint.py",
+    "thesis\\s6\\configs\\trimmed\\fold_c\\t1\\limb.py",
+    "thesis\\s6\\configs\\trimmed\\fold_c\\t2\\joint.py",
+    "thesis\\s6\\configs\\trimmed\\fold_c\\t2\\limb.py",
+    "thesis\\s6\\configs\\trimmed\\fold_c\\t3\\joint.py",
+    "thesis\\s6\\configs\\trimmed\\fold_c\\t3\\limb.py",
+    "thesis\\s6\\configs\\trimmed\\fold_c\\t4\\joint.py",
+    "thesis\\s6\\configs\\trimmed\\fold_c\\t4\\limb.py"
+  ]
+}
