@@ -42,11 +42,15 @@ except ImportError:
     )
 
 
-def latest_log_json(work_dir: Path) -> Path:
+def log_json_paths(work_dir: Path) -> list[Path]:
     paths = sorted(work_dir.glob("*.log.json"))
     if not paths:
         raise FileNotFoundError(f"No .log.json found under {work_dir}")
-    return paths[-1]
+    return paths
+
+
+def latest_log_json(work_dir: Path) -> Path:
+    return log_json_paths(work_dir)[-1]
 
 
 def checkpoint_for_epoch(work_dir: Path, epoch: int) -> Path:
@@ -60,14 +64,16 @@ def checkpoint_for_epoch(work_dir: Path, epoch: int) -> Path:
 
 
 def val_records(work_dir: Path) -> list[dict[str, Any]]:
-    log_path = latest_log_json(work_dir)
     records = []
-    for record in read_log_json_records(log_path):
-        if record.get("mode") != "val":
-            continue
-        records.append(record)
+    for log_path in log_json_paths(work_dir):
+        for record in read_log_json_records(log_path):
+            if record.get("mode") != "val":
+                continue
+            annotated = dict(record)
+            annotated["_log_json"] = str(log_path)
+            records.append(annotated)
     if not records:
-        raise ValueError(f"No validation records found in {log_path}")
+        raise ValueError(f"No validation records found under {work_dir}")
     return records
 
 
@@ -87,6 +93,7 @@ def select_from_work_dir(
     work_dir: Path,
     eta: float | None,
 ) -> dict[str, Any]:
+    log_paths = log_json_paths(work_dir)
     records = val_records(work_dir)
     selected = max(records, key=record_key)
     epoch = safe_int(selected.get("epoch"), -1)
@@ -97,7 +104,8 @@ def select_from_work_dir(
         "stream": stream,
         "eta": eta,
         "work_dir": str(work_dir),
-        "log_json": str(latest_log_json(work_dir)),
+        "log_json": str(selected.get("_log_json") or log_paths[-1]),
+        "log_jsons": [str(path) for path in log_paths],
         "checkpoint": str(checkpoint),
         "selected_epoch": epoch,
         "validation_accuracy": safe_float(selected.get("top1_acc")),
@@ -122,21 +130,24 @@ def training_log_rows(
     rows = []
     for key, selected in sorted(selected_by_run.items()):
         fold, eta_key = key
-        log_path = Path(selected["log_json"])
-        for record in read_log_json_records(log_path):
-            mode = str(record.get("mode", ""))
-            if mode not in {"train", "val"}:
-                continue
-            epoch = safe_int(record.get("epoch"), -1)
-            rows.append(
-                {
+        rows_by_key: dict[tuple[str, int, int | str], dict[str, Any]] = {}
+        log_paths = selected.get("log_jsons") or [selected["log_json"]]
+        for log_path_value in log_paths:
+            log_path = Path(str(log_path_value))
+            for record in read_log_json_records(log_path):
+                mode = str(record.get("mode", ""))
+                if mode not in {"train", "val"}:
+                    continue
+                epoch = safe_int(record.get("epoch"), -1)
+                iteration = safe_int(record.get("iter"), "")
+                rows_by_key[(mode, epoch, iteration)] = {
                     "method": method,
                     "stream": stream,
                     "fold": fold,
                     "eta": eta_key,
                     "mode": mode,
                     "epoch": epoch,
-                    "iter": safe_int(record.get("iter"), ""),
+                    "iter": iteration,
                     "training_loss": "" if mode != "train" else safe_float(record.get("loss")),
                     "training_loss_cls": "" if mode != "train" else safe_float(record.get("loss_cls")),
                     "validation_center_accuracy": "" if mode != "val" else safe_float(record.get("top1_acc")),
@@ -147,7 +158,17 @@ def training_log_rows(
                     "selected_eta": int(bool(selected.get("selected_eta", True))),
                     "checkpoint": selected["checkpoint"] if epoch == int(selected["selected_epoch"]) else "",
                 }
+        rows.extend(
+            rows_by_key[key]
+            for key in sorted(
+                rows_by_key,
+                key=lambda item: (
+                    item[1],
+                    0 if item[0] == "train" else 1,
+                    item[2] if isinstance(item[2], int) else -1,
+                ),
             )
+        )
     return rows
 
 
