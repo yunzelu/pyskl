@@ -1,5 +1,5 @@
 {
-  "ann_file": "data\\radar_v4\\pyskl\\s2\\radarv4_yolo26xpose_clip60_s2_continuous.pkl",
+  "ann_file": "data/radar_v4/pyskl/s2/radarv4_yolo26xpose_clip60_s2_continuous.pkl",
   "folds": [
     "a",
     "b",
@@ -22,113 +22,113 @@
   "class_sample_strategy": "sqrt",
   "class_sample_power": 0.5,
   "epoch_size_by_fold": {
-    "a": 52806,
-    "b": 54711,
-    "c": 53244
+    "a": 44017,
+    "b": 45603,
+    "c": 44389
   },
   "class_counts_by_fold": {
     "a": [
-      1702,
-      9819,
-      5467,
-      2079,
-      4188,
-      1853,
-      1709,
-      2186,
-      23803
+      1425,
+      8164,
+      4562,
+      1746,
+      3495,
+      1552,
+      1414,
+      1812,
+      19847
     ],
     "b": [
-      1903,
-      8820,
-      5360,
-      2162,
-      4710,
-      1982,
-      1900,
-      2404,
-      25470
+      1589,
+      7336,
+      4450,
+      1812,
+      3926,
+      1640,
+      1574,
+      2036,
+      21240
     ],
     "c": [
-      1678,
-      10802,
-      4881,
-      2190,
-      4739,
-      1804,
-      1783,
-      2049,
-      23318
+      1398,
+      9003,
+      4056,
+      1831,
+      3951,
+      1502,
+      1473,
+      1706,
+      19469
     ]
   },
   "class_sampling_probs_by_fold": {
     "a": [
-      0.06762947372808861,
-      0.1624388327302368,
-      0.12120785536813347,
-      0.07474522863658807,
-      0.10608636445134108,
-      0.07056574641458943,
-      0.06776840456155671,
-      0.07664455531512625,
-      0.2529135387943396
+      0.06777280151993993,
+      0.1622181724250824,
+      0.1212622568351627,
+      0.07501880225020367,
+      0.10613817021746767,
+      0.07072840505014885,
+      0.06751071552616315,
+      0.07642353159266489,
+      0.25292714458316684
     ],
     "b": [
-      0.07006540740587675,
-      0.15084070378368358,
-      0.11758898788828244,
-      0.07468134007501091,
-      0.11022870647747851,
-      0.07150494592521316,
-      0.07001015802884816,
-      0.07875016803406366,
-      0.25632958238154285
+      0.07012096057493065,
+      0.1506661079218546,
+      0.11734535784187221,
+      0.07487985674256306,
+      0.11022016474253397,
+      0.07123736257970621,
+      0.06978920838806582,
+      0.07937336547350396,
+      0.25636761573496947
     ],
     "c": [
-      0.06681734216875707,
-      0.16952950919553056,
-      0.11395873561556458,
-      0.07633351753804207,
-      0.11228883410340865,
-      0.06928057521324806,
-      0.06887615422370957,
-      0.07383532611764242,
-      0.2490800058240971
+      0.06681788255376296,
+      0.16956364673055063,
+      0.11381201076299935,
+      0.07646862749063385,
+      0.11232919277397156,
+      0.06925866076059332,
+      0.06858679300825891,
+      0.07381228271761978,
+      0.2493509032016096
     ]
   },
   "expected_epoch_samples_by_fold": {
     "a": [
-      3571.241989685447,
-      8577.745001152884,
-      6400.502010569656,
-      3946.9965433836696,
-      5601.996561217517,
-      3726.2948051688095,
-      3578.5783712775637,
-      4047.292387970557,
-      13355.352329573896
+      2983.1554045031958,
+      7140.357295634853,
+      5337.600759113357,
+      3302.102618647215,
+      4671.883838462275,
+      3113.252205092402,
+      2971.6191653151236,
+      3363.9345901143306,
+      11133.094123117255
     ],
     "b": [
-      3833.3485045829225,
-      8252.645744709112,
-      6433.411116355821,
-      4085.890796843922,
-      6030.722760089327,
-      3912.107096514337,
-      3830.3257559163117,
-      4308.500443311657,
-      14024.04778167659
+      3197.7261650985624,
+      6870.826519560334,
+      5351.3003536628985,
+      3414.7461070311033,
+      5026.370172753776,
+      3248.6374457223424,
+      3182.5972701209657,
+      3619.6635856882012,
+      11691.132380361812
     ],
     "c": [
-      3557.622566433301,
-      9026.42918760683,
-      6067.618919115121,
-      4064.301807795512,
-      5978.70668300189,
-      3688.7749466541795,
-      3667.2419554871926,
-      3931.288103807753,
-      13262.015830098226
+      2965.978988678984,
+      7526.760714722412,
+      5052.001345758778,
+      3394.365905681746,
+      4986.180538043824,
+      3074.322692501977,
+      3044.499154843605,
+      3276.453417552424,
+      11068.437242216249
     ]
   },
   "labels": [
@@ -144,40 +144,40 @@
   ],
   "configs": {
     "A": [
-      "thesis\\s2\\configs\\fold_a\\joint\\posec3d_trimmed_baseline_A.py",
-      "thesis\\s2\\configs\\fold_a\\limb\\posec3d_trimmed_baseline_A.py",
-      "thesis\\s2\\configs\\fold_b\\joint\\posec3d_trimmed_baseline_A.py",
-      "thesis\\s2\\configs\\fold_b\\limb\\posec3d_trimmed_baseline_A.py",
-      "thesis\\s2\\configs\\fold_c\\joint\\posec3d_trimmed_baseline_A.py",
-      "thesis\\s2\\configs\\fold_c\\limb\\posec3d_trimmed_baseline_A.py"
+      "thesis/s2/configs/fold_a/joint/posec3d_trimmed_baseline_A.py",
+      "thesis/s2/configs/fold_a/limb/posec3d_trimmed_baseline_A.py",
+      "thesis/s2/configs/fold_b/joint/posec3d_trimmed_baseline_A.py",
+      "thesis/s2/configs/fold_b/limb/posec3d_trimmed_baseline_A.py",
+      "thesis/s2/configs/fold_c/joint/posec3d_trimmed_baseline_A.py",
+      "thesis/s2/configs/fold_c/limb/posec3d_trimmed_baseline_A.py"
     ],
     "B": [
-      "thesis\\s2\\configs\\fold_a\\joint\\posec3d_continuous_hard_B.py",
-      "thesis\\s2\\configs\\fold_a\\limb\\posec3d_continuous_hard_B.py",
-      "thesis\\s2\\configs\\fold_b\\joint\\posec3d_continuous_hard_B.py",
-      "thesis\\s2\\configs\\fold_b\\limb\\posec3d_continuous_hard_B.py",
-      "thesis\\s2\\configs\\fold_c\\joint\\posec3d_continuous_hard_B.py",
-      "thesis\\s2\\configs\\fold_c\\limb\\posec3d_continuous_hard_B.py"
+      "thesis/s2/configs/fold_a/joint/posec3d_continuous_hard_B.py",
+      "thesis/s2/configs/fold_a/limb/posec3d_continuous_hard_B.py",
+      "thesis/s2/configs/fold_b/joint/posec3d_continuous_hard_B.py",
+      "thesis/s2/configs/fold_b/limb/posec3d_continuous_hard_B.py",
+      "thesis/s2/configs/fold_c/joint/posec3d_continuous_hard_B.py",
+      "thesis/s2/configs/fold_c/limb/posec3d_continuous_hard_B.py"
     ],
     "C": [
-      "thesis\\s2\\configs\\fold_a\\joint\\posec3d_continuous_soft_C_eta025.py",
-      "thesis\\s2\\configs\\fold_a\\joint\\posec3d_continuous_soft_C_eta050.py",
-      "thesis\\s2\\configs\\fold_a\\joint\\posec3d_continuous_soft_C_eta075.py",
-      "thesis\\s2\\configs\\fold_a\\limb\\posec3d_continuous_soft_C_eta025.py",
-      "thesis\\s2\\configs\\fold_a\\limb\\posec3d_continuous_soft_C_eta050.py",
-      "thesis\\s2\\configs\\fold_a\\limb\\posec3d_continuous_soft_C_eta075.py",
-      "thesis\\s2\\configs\\fold_b\\joint\\posec3d_continuous_soft_C_eta025.py",
-      "thesis\\s2\\configs\\fold_b\\joint\\posec3d_continuous_soft_C_eta050.py",
-      "thesis\\s2\\configs\\fold_b\\joint\\posec3d_continuous_soft_C_eta075.py",
-      "thesis\\s2\\configs\\fold_b\\limb\\posec3d_continuous_soft_C_eta025.py",
-      "thesis\\s2\\configs\\fold_b\\limb\\posec3d_continuous_soft_C_eta050.py",
-      "thesis\\s2\\configs\\fold_b\\limb\\posec3d_continuous_soft_C_eta075.py",
-      "thesis\\s2\\configs\\fold_c\\joint\\posec3d_continuous_soft_C_eta025.py",
-      "thesis\\s2\\configs\\fold_c\\joint\\posec3d_continuous_soft_C_eta050.py",
-      "thesis\\s2\\configs\\fold_c\\joint\\posec3d_continuous_soft_C_eta075.py",
-      "thesis\\s2\\configs\\fold_c\\limb\\posec3d_continuous_soft_C_eta025.py",
-      "thesis\\s2\\configs\\fold_c\\limb\\posec3d_continuous_soft_C_eta050.py",
-      "thesis\\s2\\configs\\fold_c\\limb\\posec3d_continuous_soft_C_eta075.py"
+      "thesis/s2/configs/fold_a/joint/posec3d_continuous_soft_C_eta025.py",
+      "thesis/s2/configs/fold_a/joint/posec3d_continuous_soft_C_eta050.py",
+      "thesis/s2/configs/fold_a/joint/posec3d_continuous_soft_C_eta075.py",
+      "thesis/s2/configs/fold_a/limb/posec3d_continuous_soft_C_eta025.py",
+      "thesis/s2/configs/fold_a/limb/posec3d_continuous_soft_C_eta050.py",
+      "thesis/s2/configs/fold_a/limb/posec3d_continuous_soft_C_eta075.py",
+      "thesis/s2/configs/fold_b/joint/posec3d_continuous_soft_C_eta025.py",
+      "thesis/s2/configs/fold_b/joint/posec3d_continuous_soft_C_eta050.py",
+      "thesis/s2/configs/fold_b/joint/posec3d_continuous_soft_C_eta075.py",
+      "thesis/s2/configs/fold_b/limb/posec3d_continuous_soft_C_eta025.py",
+      "thesis/s2/configs/fold_b/limb/posec3d_continuous_soft_C_eta050.py",
+      "thesis/s2/configs/fold_b/limb/posec3d_continuous_soft_C_eta075.py",
+      "thesis/s2/configs/fold_c/joint/posec3d_continuous_soft_C_eta025.py",
+      "thesis/s2/configs/fold_c/joint/posec3d_continuous_soft_C_eta050.py",
+      "thesis/s2/configs/fold_c/joint/posec3d_continuous_soft_C_eta075.py",
+      "thesis/s2/configs/fold_c/limb/posec3d_continuous_soft_C_eta025.py",
+      "thesis/s2/configs/fold_c/limb/posec3d_continuous_soft_C_eta050.py",
+      "thesis/s2/configs/fold_c/limb/posec3d_continuous_soft_C_eta075.py"
     ]
   }
 }

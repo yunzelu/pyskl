@@ -6,7 +6,7 @@
 
 stream = 'limb'
 stage1_config = 'configs/posec3d/slowonly_r50_radarv4/8111/fold_b/limb.py'
-stage1_checkpoint = 'work_dirs/posec3d/8111/radarv4_yolo26xpose_clip60_8111_fold_b_val_mia_calib_li_test_jiadi/limb/epoch_7.pth'
+stage1_checkpoint = 'work_dirs/posec3d/8111/radarv4_yolo26xpose_clip60_8111_fold_b_val_mia_calib_li_test_jiadi/limb/epoch_19.pth'
 ann_file = 'data/radar_v4/pyskl/8111/radarv4_yolo26xpose_clip60_8111_fold_b_val_mia_calib_li_test_jiadi.pkl'
 dataset_type = 'PoseDataset'
 

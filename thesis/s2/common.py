@@ -26,7 +26,7 @@ from thesis.e2.common import (  # noqa: E402
     FPS,
     LABELS,
     LABEL_TO_ID,
-    STRIDE,
+    # STRIDE,
     WINDOW_SIZE,
     checkpoint_epoch,
     clean_group,
@@ -40,6 +40,8 @@ from thesis.e2.common import (  # noqa: E402
     score_columns,
     write_json,
 )
+
+STRIDE = 12
 
 DEFAULT_STAGE1_PKL_DIR = Path("data/radar_v4/pyskl/8111")
 DEFAULT_PKL_DIR = Path("data/radar_v4/pyskl/s2")

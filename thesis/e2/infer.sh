@@ -3,7 +3,7 @@
 #SBATCH --gpus=a100_3g.20gb:1
 #SBATCH --cpus-per-task=6
 #SBATCH --mem=31G
-#SBATCH --time=02:00:00
+#SBATCH --time=01:00:00
 #SBATCH --job-name=e2_infer
 #SBATCH --output=thesis/e2/%x_%j.out
 #SBATCH --mail-user=yunzelu@outlook.com
@@ -16,6 +16,8 @@ cd ~/projects/def-mbolic/yunzelu/pyskl/
 
 export CUDA_VISIBLE_DEVICES=0
 
-# python thesis/e2/infer_scores.py --stream joint --overwrite
-python thesis/e2/infer_scores.py --stream limb  --overwrite
+# python thesis/e2/infer_logits.py --stream joint --overwrite
 
+# python thesis/e2/evaluate.py --scores work_dirs/thesis/e2/scores/e2_joint_logits.csv --overwrite
+
+python thesis/s2/stage1_report.py --overwrite

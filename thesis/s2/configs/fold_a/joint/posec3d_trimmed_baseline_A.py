@@ -6,7 +6,7 @@
 
 stream = 'joint'
 stage1_config = 'configs/posec3d/slowonly_r50_radarv4/8111/fold_a/joint.py'
-stage1_checkpoint = 'work_dirs/posec3d/8111/radarv4_yolo26xpose_clip60_8111_fold_a_val_han_calib_dengdeng_test_chenzhe/joint/epoch_18.pth'
+stage1_checkpoint = 'work_dirs/posec3d/8111/radarv4_yolo26xpose_clip60_8111_fold_a_val_han_calib_dengdeng_test_chenzhe/joint/epoch_9.pth'
 ann_file = 'data/radar_v4/pyskl/8111/radarv4_yolo26xpose_clip60_8111_fold_a_val_han_calib_dengdeng_test_chenzhe.pkl'
 dataset_type = 'PoseDataset'
 
