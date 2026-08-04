@@ -485,6 +485,7 @@ def metrics_table_rows(summary: dict[str, dict[str, Any]]) -> list[dict[str, Any
     rows = []
     for key, name in (
         ("deterministic", "Deterministic"),
+        ("deterministic_calibrated", "Deterministic calibrated"),
         ("mc_raw", "MC raw"),
         ("mc_calibrated", "MC calibrated"),
     ):
@@ -508,11 +509,13 @@ def metrics_table_rows(summary: dict[str, dict[str, Any]]) -> list[dict[str, Any
 
 def uncertainty_score_maps(
     deterministic_probs: np.ndarray,
+    deterministic_calibrated_probs: np.ndarray,
     raw_quantities: dict[str, np.ndarray],
     calibrated_quantities: dict[str, np.ndarray],
 ) -> dict[str, np.ndarray]:
     return {
         "deterministic_1_confidence": 1.0 - np.max(deterministic_probs, axis=1),
+        "deterministic_calibrated_1_confidence": 1.0 - np.max(deterministic_calibrated_probs, axis=1),
         "mc_raw_1_confidence": 1.0 - raw_quantities["confidence"],
         "mc_raw_predictive_entropy": raw_quantities["predictive_entropy"],
         "mc_raw_mutual_information": raw_quantities["mutual_information"],
@@ -555,6 +558,8 @@ def uncertainty_quality_rows(
 
 
 def predictions_for_score(name: str, predictions_by_mode: dict[str, np.ndarray]) -> np.ndarray:
+    if name.startswith("deterministic_calibrated_"):
+        return predictions_by_mode["deterministic_calibrated"]
     if name.startswith("deterministic_"):
         return predictions_by_mode["deterministic"]
     if name.startswith("mc_raw_"):
@@ -563,6 +568,8 @@ def predictions_for_score(name: str, predictions_by_mode: dict[str, np.ndarray])
 
 
 def probabilities_for_score(name: str, probabilities_by_mode: dict[str, np.ndarray]) -> np.ndarray:
+    if name.startswith("deterministic_calibrated_"):
+        return probabilities_by_mode["deterministic_calibrated"]
     if name.startswith("deterministic_"):
         return probabilities_by_mode["deterministic"]
     if name.startswith("mc_raw_"):
@@ -680,10 +687,12 @@ def sample_rows(
     samples: list[SampleMeta],
     det_logits: np.ndarray,
     det_probs: np.ndarray,
+    det_cal_probs: np.ndarray,
     mc_raw_quantities: dict[str, np.ndarray],
     mc_cal_quantities: dict[str, np.ndarray],
 ) -> list[dict[str, Any]]:
     det_predictions = np.argmax(det_probs, axis=1)
+    det_cal_predictions = np.argmax(det_cal_probs, axis=1)
     raw_predictions = mc_raw_quantities["prediction"]
     cal_predictions = mc_cal_quantities["prediction"]
     rows = []
@@ -703,11 +712,14 @@ def sample_rows(
                 "ground_truth_label": item.label_name,
                 "deterministic_pred_id": int(det_predictions[index]),
                 "deterministic_pred_label": LABELS[int(det_predictions[index])],
+                "deterministic_calibrated_pred_id": int(det_cal_predictions[index]),
+                "deterministic_calibrated_pred_label": LABELS[int(det_cal_predictions[index])],
                 "mc_raw_pred_id": int(raw_predictions[index]),
                 "mc_raw_pred_label": LABELS[int(raw_predictions[index])],
                 "mc_calibrated_pred_id": int(cal_predictions[index]),
                 "mc_calibrated_pred_label": LABELS[int(cal_predictions[index])],
                 "deterministic_confidence": f"{float(np.max(det_probs[index])):.8f}",
+                "deterministic_calibrated_confidence": f"{float(np.max(det_cal_probs[index])):.8f}",
                 "mc_raw_confidence": f"{float(mc_raw_quantities['confidence'][index]):.8f}",
                 "mc_calibrated_confidence": f"{float(mc_cal_quantities['confidence'][index]):.8f}",
                 "mc_raw_predictive_entropy": f"{float(mc_raw_quantities['predictive_entropy'][index]):.8f}",
@@ -722,6 +734,7 @@ def sample_rows(
                 "mc_calibrated_mean_probability_variance": f"{float(mc_cal_quantities['mean_probability_variance'][index]):.8f}",
                 "deterministic_logits": array_to_text(det_logits[index]),
                 "deterministic_probabilities": array_to_text(det_probs[index]),
+                "deterministic_calibrated_probabilities": array_to_text(det_cal_probs[index]),
                 "mc_mean_raw_probabilities": array_to_text(mc_raw_quantities["probabilities"][index]),
                 "mc_mean_calibrated_probabilities": array_to_text(mc_cal_quantities["probabilities"][index]),
             }
@@ -733,16 +746,20 @@ def save_npz_outputs(
     out_dir: Path,
     calibration: dict[str, Any],
     test: dict[str, Any],
-    temperature: float,
+    deterministic_temperature: float,
+    mc_temperature: float,
 ) -> None:
     np.savez_compressed(
         out_dir / "deterministic_predictions.npz",
         calibration_logits=calibration["det_logits"],
         calibration_probabilities=calibration["det_probs"],
+        calibration_calibrated_probabilities=calibration["det_cal_probs"],
         calibration_labels=calibration["labels"],
         test_logits=test["det_logits"],
         test_probabilities=test["det_probs"],
+        test_calibrated_probabilities=test["det_cal_probs"],
         test_labels=test["labels"],
+        deterministic_temperature=np.asarray([deterministic_temperature], dtype=np.float64),
     )
     np.savez_compressed(
         out_dir / "calibration_mc_logits.npz",
@@ -750,7 +767,7 @@ def save_npz_outputs(
         labels=calibration["labels"],
         mean_raw_probabilities=calibration["mc_raw"]["probabilities"],
         mean_calibrated_probabilities=calibration["mc_calibrated"]["probabilities"],
-        temperature=np.asarray([temperature], dtype=np.float64),
+        temperature=np.asarray([mc_temperature], dtype=np.float64),
     )
     np.savez_compressed(
         out_dir / "test_mc_logits.npz",
@@ -758,7 +775,7 @@ def save_npz_outputs(
         labels=test["labels"],
         mean_raw_probabilities=test["mc_raw"]["probabilities"],
         mean_calibrated_probabilities=test["mc_calibrated"]["probabilities"],
-        temperature=np.asarray([temperature], dtype=np.float64),
+        temperature=np.asarray([mc_temperature], dtype=np.float64),
     )
 
 
@@ -781,9 +798,11 @@ def save_sequence_outputs(out_dir: Path, samples: list[SampleMeta], test: dict[s
             ground_truth_label=np.asarray([samples[idx].label_name for idx in indices]),
             deterministic_logits=test["det_logits"][indices],
             deterministic_probabilities=test["det_probs"][indices],
+            deterministic_calibrated_probabilities=test["det_cal_probs"][indices],
             mc_mean_raw_probabilities=test["mc_raw"]["probabilities"][indices],
             mc_mean_calibrated_probabilities=test["mc_calibrated"]["probabilities"][indices],
             deterministic_pred_id=np.argmax(test["det_probs"][indices], axis=1).astype(np.int64),
+            deterministic_calibrated_pred_id=np.argmax(test["det_cal_probs"][indices], axis=1).astype(np.int64),
             mc_raw_pred_id=test["mc_raw"]["prediction"][indices].astype(np.int64),
             mc_calibrated_pred_id=test["mc_calibrated"]["prediction"][indices].astype(np.int64),
             predictive_entropy=test["mc_calibrated"]["predictive_entropy"][indices],
@@ -809,6 +828,7 @@ def make_plots(
     labels: np.ndarray,
     metrics: dict[str, dict[str, Any]],
     det_probs: np.ndarray,
+    det_cal_probs: np.ndarray,
     raw_probs: np.ndarray,
     cal_probs: np.ndarray,
     coverage: list[dict[str, Any]],
@@ -847,11 +867,17 @@ def make_plots(
         plt.close(fig)
 
     reliability(plot_dir / "reliability_diagram_deterministic.png", det_probs, "Deterministic")
+    reliability(
+        plot_dir / "reliability_diagram_deterministic_calibrated.png",
+        det_cal_probs,
+        "Deterministic calibrated",
+    )
     reliability(plot_dir / "reliability_diagram_mc_raw.png", raw_probs, "MC raw")
     reliability(plot_dir / "reliability_diagram_mc_calibrated.png", cal_probs, "MC calibrated")
 
     selected_scores = {
         "deterministic_1_confidence",
+        "deterministic_calibrated_1_confidence",
         "mc_raw_predictive_entropy",
         "mc_raw_mutual_information",
         "mc_calibrated_mutual_information",
@@ -907,6 +933,11 @@ def make_plots(
         "Deterministic confusion matrix",
     )
     confusion_plot(
+        plot_dir / "confusion_matrix_deterministic_calibrated.png",
+        metrics["deterministic_calibrated"]["confusion_matrix"],
+        "Deterministic calibrated confusion matrix",
+    )
+    confusion_plot(
         plot_dir / "confusion_matrix_mc_calibrated.png",
         metrics["mc_calibrated"]["confusion_matrix"],
         "MC calibrated confusion matrix",
@@ -932,7 +963,8 @@ def write_readme(
     out_dir: Path,
     command: str,
     experiment: dict[str, Any],
-    temperature: dict[str, Any],
+    deterministic_temperature: dict[str, Any],
+    mc_temperature: dict[str, Any],
     dropout_info: list[dict[str, Any]],
     warnings: list[str],
 ) -> None:
@@ -969,11 +1001,20 @@ MC passes: {experiment['num_passes']}
 
 ## Temperature Objective
 
-One scalar temperature `T` is fitted on calibration MC logits by minimizing:
+Two scalar temperatures are fitted on `{experiment['calibration_split']}` only.
 
-`-mean(log(mean_k softmax(z_k / T)[y]))`
+The deterministic temperature `T_det` is fitted on deterministic logits by
+minimizing:
 
-Fitted T: {temperature['temperature']:.8f}
+`-mean(log(softmax(z / T_det)[y]))`
+
+The MC temperature `T_mc` is fitted on calibration MC logits by minimizing:
+
+`-mean(log(mean_k softmax(z_k / T_mc)[y]))`
+
+Fitted deterministic T: {deterministic_temperature['temperature']:.8f}
+
+Fitted MC T: {mc_temperature['temperature']:.8f}
 
 ## Uncertainty Values
 
@@ -1006,7 +1047,8 @@ def print_tables(
     summary: dict[str, dict[str, Any]],
     uncertainty_rows: list[dict[str, Any]],
     coverage: list[dict[str, Any]],
-    temperature: dict[str, Any],
+    deterministic_temperature: dict[str, Any],
+    mc_temperature: dict[str, Any],
     dropout_info: list[dict[str, Any]],
     num_passes: int,
     calibration_count: int,
@@ -1024,7 +1066,8 @@ def print_tables(
 
     print("\nUncertainty | Error AUROC | Error AUPRC | Acc@80% coverage | Acc@60% coverage")
     display = {
-        "deterministic_1_confidence": "1-confidence",
+        "deterministic_1_confidence": "Deterministic 1-confidence",
+        "deterministic_calibrated_1_confidence": "Deterministic calibrated 1-confidence",
         "mc_calibrated_predictive_entropy": "Predictive entropy",
         "mc_calibrated_mutual_information": "MC mutual information",
         "mc_calibrated_variation_ratio": "Variation ratio",
@@ -1047,7 +1090,8 @@ def print_tables(
         )
 
     errors = calibrated_predictions != labels
-    print(f"\nFitted temperature: {temperature['temperature']:.6f}")
+    print(f"\nFitted deterministic temperature: {deterministic_temperature['temperature']:.6f}")
+    print(f"Fitted MC temperature: {mc_temperature['temperature']:.6f}")
     print(f"Dropout modules found: {len(dropout_info)}")
     print(f"MC passes: {num_passes}")
     print(f"Calibration samples: {calibration_count}")
@@ -1156,6 +1200,25 @@ def main() -> None:
     validate_probabilities(calibration_det_probs, name="calibration_det_probs")
     validate_probabilities(test_det_probs, name="test_det_probs")
 
+    print("[INFO] Fitting scalar temperature on deterministic calibration logits")
+    deterministic_temperature = fit_temperature(
+        calibration_det_logits[:, None, :],
+        calibration_labels,
+        num_bins=args.ece_bins,
+    )
+    write_json(args.out_dir / "deterministic_temperature.json", deterministic_temperature)
+    fitted_deterministic_temperature = float(deterministic_temperature["temperature"])
+    calibration_det_cal_probs = softmax_np(
+        calibration_det_logits,
+        temperature=fitted_deterministic_temperature,
+    )
+    test_det_cal_probs = softmax_np(
+        test_det_logits,
+        temperature=fitted_deterministic_temperature,
+    )
+    validate_probabilities(calibration_det_cal_probs, name="calibration_det_cal_probs")
+    validate_probabilities(test_det_cal_probs, name="test_det_cal_probs")
+
     print(f"[INFO] Running MC-dropout logits K={args.num_passes} on calibration")
     calibration_mc_logits, dropout_info, first_batch_diff = mc_logits(
         model,
@@ -1172,19 +1235,27 @@ def main() -> None:
         args.num_passes,
     )
 
-    print("[INFO] Fitting scalar temperature on calibration split")
-    temperature = fit_temperature(
+    print("[INFO] Fitting scalar temperature on calibration MC logits")
+    mc_temperature = fit_temperature(
         calibration_mc_logits,
         calibration_labels,
         num_bins=args.ece_bins,
     )
-    write_json(args.out_dir / "temperature.json", temperature)
-    fitted_temperature = float(temperature["temperature"])
+    write_json(args.out_dir / "temperature.json", mc_temperature)
+    write_json(args.out_dir / "mc_temperature.json", mc_temperature)
+    write_json(
+        args.out_dir / "temperatures.json",
+        {
+            "deterministic": deterministic_temperature,
+            "mc": mc_temperature,
+        },
+    )
+    fitted_mc_temperature = float(mc_temperature["temperature"])
 
     calibration_raw_probs_passes = softmax_np(calibration_mc_logits)
-    calibration_cal_probs_passes = softmax_np(calibration_mc_logits, temperature=fitted_temperature)
+    calibration_cal_probs_passes = softmax_np(calibration_mc_logits, temperature=fitted_mc_temperature)
     test_raw_probs_passes = softmax_np(test_mc_logits)
-    test_cal_probs_passes = softmax_np(test_mc_logits, temperature=fitted_temperature)
+    test_cal_probs_passes = softmax_np(test_mc_logits, temperature=fitted_mc_temperature)
 
     calibration_raw_quantities = predictive_quantities(calibration_raw_probs_passes)
     calibration_cal_quantities = predictive_quantities(calibration_cal_probs_passes)
@@ -1198,6 +1269,13 @@ def main() -> None:
             test_samples,
             args.ece_bins,
             "D0",
+        ),
+        "deterministic_calibrated": metrics_with_sequence(
+            test_det_cal_probs,
+            test_labels,
+            test_samples,
+            args.ece_bins,
+            "D0T",
         ),
         "mc_raw": metrics_with_sequence(
             test_raw_quantities["probabilities"],
@@ -1223,6 +1301,13 @@ def main() -> None:
             args.ece_bins,
             "D0_calibration",
         ),
+        "deterministic_calibrated": metrics_with_sequence(
+            calibration_det_cal_probs,
+            calibration_labels,
+            calibration_samples,
+            args.ece_bins,
+            "D0T_calibration",
+        ),
         "mc_raw": metrics_with_sequence(
             calibration_raw_quantities["probabilities"],
             calibration_labels,
@@ -1239,11 +1324,17 @@ def main() -> None:
         ),
     }
 
-    uncertainty_scores = uncertainty_score_maps(test_det_probs, test_raw_quantities, test_cal_quantities)
+    uncertainty_scores = uncertainty_score_maps(
+        test_det_probs,
+        test_det_cal_probs,
+        test_raw_quantities,
+        test_cal_quantities,
+    )
     uncertainty_rows = uncertainty_quality_rows(
         uncertainty_scores,
         {
             "deterministic": np.argmax(test_det_probs, axis=1),
+            "deterministic_calibrated": np.argmax(test_det_cal_probs, axis=1),
             "mc_raw": test_raw_quantities["prediction"],
             "mc_calibrated": test_cal_quantities["prediction"],
         },
@@ -1253,6 +1344,7 @@ def main() -> None:
         uncertainty_scores,
         {
             "deterministic": test_det_probs,
+            "deterministic_calibrated": test_det_cal_probs,
             "mc_raw": test_raw_quantities["probabilities"],
             "mc_calibrated": test_cal_quantities["probabilities"],
         },
@@ -1269,6 +1361,7 @@ def main() -> None:
         "labels": calibration_labels,
         "det_logits": calibration_det_logits,
         "det_probs": calibration_det_probs,
+        "det_cal_probs": calibration_det_cal_probs,
         "mc_logits": calibration_mc_logits,
         "mc_raw": calibration_raw_quantities,
         "mc_calibrated": calibration_cal_quantities,
@@ -1277,11 +1370,18 @@ def main() -> None:
         "labels": test_labels,
         "det_logits": test_det_logits,
         "det_probs": test_det_probs,
+        "det_cal_probs": test_det_cal_probs,
         "mc_logits": test_mc_logits,
         "mc_raw": test_raw_quantities,
         "mc_calibrated": test_cal_quantities,
     }
-    save_npz_outputs(args.out_dir, calibration, test, fitted_temperature)
+    save_npz_outputs(
+        args.out_dir,
+        calibration,
+        test,
+        fitted_deterministic_temperature,
+        fitted_mc_temperature,
+    )
     save_sequence_outputs(args.out_dir, test_samples, test)
 
     write_csv(
@@ -1290,6 +1390,7 @@ def main() -> None:
             calibration_samples,
             calibration_det_logits,
             calibration_det_probs,
+            calibration_det_cal_probs,
             calibration_raw_quantities,
             calibration_cal_quantities,
         ),
@@ -1300,6 +1401,7 @@ def main() -> None:
             test_samples,
             test_det_logits,
             test_det_probs,
+            test_det_cal_probs,
             test_raw_quantities,
             test_cal_quantities,
         ),
@@ -1315,6 +1417,11 @@ def main() -> None:
         "deterministic",
     )
     save_confusion_csv(
+        args.out_dir / "confusion_matrix_deterministic_calibrated.csv",
+        test_summary["deterministic_calibrated"]["confusion_matrix"],
+        "deterministic_calibrated",
+    )
+    save_confusion_csv(
         args.out_dir / "confusion_matrix_mc_calibrated.csv",
         test_summary["mc_calibrated"]["confusion_matrix"],
         "mc_calibrated",
@@ -1325,6 +1432,7 @@ def main() -> None:
         test_labels,
         test_summary,
         test_det_probs,
+        test_det_cal_probs,
         test_raw_quantities["probabilities"],
         test_cal_quantities["probabilities"],
         coverage,
@@ -1334,7 +1442,13 @@ def main() -> None:
 
     summary_metrics = {
         "experiment": experiment,
-        "temperature": temperature,
+        "temperature": mc_temperature,
+        "deterministic_temperature": deterministic_temperature,
+        "mc_temperature": mc_temperature,
+        "temperatures": {
+            "deterministic": deterministic_temperature,
+            "mc": mc_temperature,
+        },
         "dropout_modules": dropout_info,
         "mc_first_batch_pass1_pass2_mean_abs_diff": first_batch_diff,
         "calibration": calibration_summary,
@@ -1345,13 +1459,22 @@ def main() -> None:
         "primary_epistemic_uncertainty": "mc_calibrated_mutual_information",
     }
     write_json(args.out_dir / "summary_metrics.json", summary_metrics)
-    write_readme(args.out_dir, command, experiment, temperature, dropout_info, plot_warnings)
+    write_readme(
+        args.out_dir,
+        command,
+        experiment,
+        deterministic_temperature,
+        mc_temperature,
+        dropout_info,
+        plot_warnings,
+    )
 
     print_tables(
         test_summary,
         uncertainty_rows,
         coverage,
-        temperature,
+        deterministic_temperature,
+        mc_temperature,
         dropout_info,
         args.num_passes,
         len(calibration_samples),
