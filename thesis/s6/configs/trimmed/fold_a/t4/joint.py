@@ -52,6 +52,16 @@ right_limb = [1, 4, 5, 9, 10, 11, 13, 15]
 # Pseudo-label target/test split: xilai, yunze
 # Original fold test subject unused here: chenzhe
 # Zero-frame policy: build_pyskl_pkl removes all-zero pose frames and drops samples with <30 retained frames.
+# Train counts after zero-frame filtering:
+# Falling: 338
+# Lying-Stationary: 679
+# Sit-Stationary: 355
+# Transition-LayBed-to-Sit: 346
+# Transition-LayFloor-to-Stand: 335
+# Transition-Sit-to-LayBed: 347
+# Transition-Sit-to-Stand: 689
+# Transition-Stand-to-Sit: 693
+# Walking: 1074
 class_prob = [2.0, 1.0, 2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0]
 
 generate_pose_target = dict(
