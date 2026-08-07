@@ -61,3 +61,51 @@ Outputs:
 - Continuous teacher pkl: `data/radar_v4/pyskl/s2/radarv4_yolo26xpose_clip60_s2_teacher4_s6_continuous.pkl`
 - Continuous configs: `thesis/s6/configs/continuous/`
 - Continuous checkpoints: `work_dirs/thesis/s6/continuous_hard/`
+
+## Pseudo Label Export
+
+After continuous fine-tuning, each teacher labels only its own pseudo split. For
+example, `fold_a/t1` labels `fold_a_t1_pseudo`. Temperature is fitted from the
+same teacher's calibration split, for example `fold_a_t1_calib`, and is reused
+for deterministic calibrated and MC calibrated outputs.
+
+Recommended order:
+
+```bash
+sbatch thesis/s6/pseudo_fit_temperature.sh
+```
+
+After the temperature job has finished, export the pseudo-label variants:
+
+```bash
+sbatch thesis/s6/pseudo_hard_labels.sh
+sbatch thesis/s6/pseudo_raw_soft.sh
+sbatch thesis/s6/pseudo_calibrated_soft.sh
+sbatch thesis/s6/pseudo_mc_calibrated_soft.sh
+```
+
+Useful restricted run:
+
+```bash
+RUN_FOLDS="a" RUN_TEACHERS="t1" RUN_STREAMS="joint limb" sbatch thesis/s6/pseudo_mc_calibrated_soft.sh
+```
+
+Pseudo-label outputs are written under:
+
+```text
+work_dirs/thesis/s6/pseudo_labels/fold_<fold>/<teacher>/<stream>/
+```
+
+Main files per teacher/stream:
+
+- `temperature.json`
+- `deterministic_hard_pseudo_labels.csv`
+- `raw_soft_probabilities.csv`
+- `calibrated_soft_probabilities.csv`
+- `mc_calibrated_soft_probabilities.csv`
+- matching `.npz` files with arrays and metadata
+
+The MC file stores calibrated per-pass probabilities with shape `[N, K, C]`,
+the calibrated predictive mean, hard pseudo labels from the predictive mean,
+and uncertainty quantities. Set `SAVE_MC_LOGITS=1` for the MC job if raw MC
+logits also need to be stored.

@@ -11,6 +11,29 @@ from typing import Any
 
 import numpy as np
 
+SUMMARY_METRICS = [
+    "center_acc",
+    "center_macro_f1",
+    "state_macro_f1",
+    "transition_macro_f1",
+    "edit",
+    "f1_10",
+    "f1_25",
+    "f1_50",
+]
+
+FOLD_STAT_METRICS = [
+    "center_acc",
+    "center_macro_f1",
+    "center_weighted_f1",
+    "state_macro_f1",
+    "transition_macro_f1",
+    "edit",
+    "f1_10",
+    "f1_25",
+    "f1_50",
+]
+
 try:
     from .common import (
         DEFAULT_EVAL_DIR,
@@ -392,6 +415,24 @@ def scoped_rows(rows: list[EvalRow]) -> list[tuple[str, str, str, list[EvalRow]]
     return scopes
 
 
+def fold_metric_stats(scopes: list[dict[str, Any]]) -> dict[str, Any]:
+    fold_rows = [row for row in scopes if row["scope"] == "fold"]
+    sd_ddof = 1 if len(fold_rows) > 1 else 0
+    stats: dict[str, Any] = {
+        "scope": "fold",
+        "fold_count": len(fold_rows),
+        "folds": [str(row["fold"]) for row in fold_rows],
+        "sd_ddof": sd_ddof,
+        "mean": {},
+        "sd": {},
+    }
+    for metric in FOLD_STAT_METRICS:
+        values = np.asarray([float(row[metric]) for row in fold_rows], dtype=np.float64)
+        stats["mean"][metric] = float(np.mean(values)) if values.size else 0.0
+        stats["sd"][metric] = float(np.std(values, ddof=sd_ddof)) if values.size else 0.0
+    return stats
+
+
 def write_per_class(path: Path, method: str, rows: list[EvalRow], overwrite: bool) -> None:
     fieldnames = [
         "method",
@@ -466,6 +507,7 @@ def evaluate_predictions(
         for scope, fold, recording_id, scope_rows in scoped_rows(rows)
     ]
     overall = scopes[0]
+    fold_stats = fold_metric_stats(scopes)
     result = {
         "experiment": "S2",
         "stage": "evaluation",
@@ -476,36 +518,41 @@ def evaluate_predictions(
         "temporal_resolution_seconds": STRIDE / FPS,
         "summary": scopes,
         "overall": overall,
+        "fold_summary": fold_stats,
     }
     write_json(metrics_path, result, overwrite)
     write_per_class(per_class_path, method, rows, overwrite)
     write_confusion(confusion_path, method, rows, overwrite)
+    summary_fieldnames = [
+        "method",
+        *SUMMARY_METRICS,
+        "fold_count",
+        "fold_sd_ddof",
+        *[f"{metric}_fold_mean" for metric in SUMMARY_METRICS],
+        *[f"{metric}_fold_sd" for metric in SUMMARY_METRICS],
+    ]
+    summary_row = {
+        "method": method,
+        "fold_count": fold_stats["fold_count"],
+        "fold_sd_ddof": fold_stats["sd_ddof"],
+    }
+    summary_row.update({metric: f"{overall[metric]:.6f}" for metric in SUMMARY_METRICS})
+    summary_row.update(
+        {
+            f"{metric}_fold_mean": f"{fold_stats['mean'][metric]:.6f}"
+            for metric in SUMMARY_METRICS
+        }
+    )
+    summary_row.update(
+        {
+            f"{metric}_fold_sd": f"{fold_stats['sd'][metric]:.6f}"
+            for metric in SUMMARY_METRICS
+        }
+    )
     write_rows_csv(
         summary_path,
-        [
-            "method",
-            "center_acc",
-            "center_macro_f1",
-            "state_macro_f1",
-            "transition_macro_f1",
-            "edit",
-            "f1_10",
-            "f1_25",
-            "f1_50",
-        ],
-        [
-            {
-                "method": method,
-                "center_acc": f"{overall['center_acc']:.6f}",
-                "center_macro_f1": f"{overall['center_macro_f1']:.6f}",
-                "state_macro_f1": f"{overall['state_macro_f1']:.6f}",
-                "transition_macro_f1": f"{overall['transition_macro_f1']:.6f}",
-                "edit": f"{overall['edit']:.6f}",
-                "f1_10": f"{overall['f1_10']:.6f}",
-                "f1_25": f"{overall['f1_25']:.6f}",
-                "f1_50": f"{overall['f1_50']:.6f}",
-            }
-        ],
+        summary_fieldnames,
+        [summary_row],
         overwrite,
     )
     return result
@@ -551,6 +598,25 @@ def main() -> None:
         f"state-F1={overall['state_macro_f1']:.4f}, "
         f"transition-F1={overall['transition_macro_f1']:.4f}, "
         f"F1@50={overall['f1_50']:.4f}"
+    )
+    fold_summary = result["fold_summary"]
+    fold_mean = fold_summary["mean"]
+    fold_sd = fold_summary["sd"]
+    print(
+        f"{args.method} fold mean (n={fold_summary['fold_count']}): "
+        f"acc={fold_mean['center_acc']:.4f}, "
+        f"macro-F1={fold_mean['center_macro_f1']:.4f}, "
+        f"state-F1={fold_mean['state_macro_f1']:.4f}, "
+        f"transition-F1={fold_mean['transition_macro_f1']:.4f}, "
+        f"F1@50={fold_mean['f1_50']:.4f}"
+    )
+    print(
+        f"{args.method} fold SD (ddof={fold_summary['sd_ddof']}): "
+        f"acc={fold_sd['center_acc']:.4f}, "
+        f"macro-F1={fold_sd['center_macro_f1']:.4f}, "
+        f"state-F1={fold_sd['state_macro_f1']:.4f}, "
+        f"transition-F1={fold_sd['transition_macro_f1']:.4f}, "
+        f"F1@50={fold_sd['f1_50']:.4f}"
     )
 
 
