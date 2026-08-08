@@ -134,3 +134,31 @@ Fused outputs are stored under:
 ```text
 work_dirs/thesis/s6/pseudo_labels/fold_<fold>/<teacher>/fusion_1to1/
 ```
+
+Build fold-level pseudo annotation pkls after fusion:
+
+```bash
+OVERWRITE=1 sbatch thesis/s6/build_fused_pseudo_annotations.sh
+```
+
+This creates one pkl per outer fold under:
+
+```text
+data/radar_v4/pyskl/s6_pseudo/
+```
+
+The default hard-pseudo split name inside each pkl is:
+
+```text
+fold_a_pseudo_train
+fold_b_pseudo_train
+fold_c_pseudo_train
+```
+
+The builder copies the original continuous-window skeleton samples from the
+source pkl, replaces `label`/`hard_label` with the fused pseudo label, and
+keeps manual labels as `manual_label`/`manual_label_name`. It validates exact
+window alignment by `frame_dir`, subject, recording, start/end frame, center
+frame, and center timestamp. If fusion was run from a different continuous pkl
+version, rebuild or point `SOURCE_PKL` to that exact pkl before creating the
+annotation.
