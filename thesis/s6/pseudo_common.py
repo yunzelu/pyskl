@@ -497,7 +497,6 @@ def export_hard(args: argparse.Namespace) -> None:
                 logits=logits.astype(np.float32, copy=False),
                 probabilities=probs.astype(np.float32, copy=False),
                 pseudo_label_id=np.argmax(probs, axis=1).astype(np.int64),
-                manual_label_id=labels,
                 **sample_arrays(samples),
             )
             write_run_manifest(
@@ -535,7 +534,6 @@ def export_raw_soft(args: argparse.Namespace) -> None:
                 logits=logits.astype(np.float32, copy=False),
                 probabilities=probs.astype(np.float32, copy=False),
                 pseudo_label_id=np.argmax(probs, axis=1).astype(np.int64),
-                manual_label_id=labels,
                 **sample_arrays(samples),
             )
             write_run_manifest(
@@ -578,7 +576,6 @@ def export_calibrated_soft(args: argparse.Namespace) -> None:
                 probabilities=probs.astype(np.float32, copy=False),
                 temperature=np.asarray([temperature], dtype=np.float32),
                 pseudo_label_id=np.argmax(probs, axis=1).astype(np.int64),
-                manual_label_id=labels,
                 **sample_arrays(samples),
             )
             write_run_manifest(
@@ -640,7 +637,6 @@ def export_mc_calibrated_soft(args: argparse.Namespace) -> None:
                 "probability_passes": prob_passes.astype(np.float32, copy=False),
                 "temperature": np.asarray([temperature], dtype=np.float32),
                 "pseudo_label_id": quantities["prediction"].astype(np.int64, copy=False),
-                "manual_label_id": labels,
                 "predictive_entropy": quantities["predictive_entropy"].astype(np.float32, copy=False),
                 "expected_entropy": quantities["expected_entropy"].astype(np.float32, copy=False),
                 "mutual_information": quantities["mutual_information"].astype(np.float32, copy=False),
