@@ -55,22 +55,22 @@ train_split = 'fold_a_t4_train'
 val_split = 'fold_a_t4_val'
 test_split = 'fold_a_t4_pseudo'
 # Stage-2 teacher fine-tuning samples are drawn each epoch from pre-gridded train windows.
-# class_sample_strategy: sqrt; class_sample_power: 0.5; epoch_size: 38546
+# class_sample_strategy: sqrt; class_sample_power: 0.5; epoch_size: 32137
 # Class draw rule: P(c) = n_c ** class_sample_power / sum_j n_j ** class_sample_power.
 # After drawing a class, one pre-gridded window from that class is sampled uniformly with replacement.
 # Train window counts and expected draws per epoch:
-# Falling: n=1229, p=0.067076, expected_epoch_samples=2585.5
-# Lying-Stationary: n=7991, p=0.171037, expected_epoch_samples=6592.8
-# Sit-Stationary: n=4363, p=0.126381, expected_epoch_samples=4871.5
-# Transition-LayBed-to-Sit: n=1537, p=0.075011, expected_epoch_samples=2891.4
-# Transition-LayFloor-to-Stand: n=3153, p=0.107436, expected_epoch_samples=4141.2
-# Transition-Sit-to-LayBed: n=1237, p=0.067294, expected_epoch_samples=2593.9
-# Transition-Sit-to-Stand: n=1257, p=0.067836, expected_epoch_samples=2614.8
-# Transition-Stand-to-Sit: n=1483, p=0.073682, expected_epoch_samples=2840.1
-# Walking: n=16296, p=0.244247, expected_epoch_samples=9414.8
+# Falling: n=1026, p=0.067137, expected_epoch_samples=2157.6
+# Lying-Stationary: n=6658, p=0.171025, expected_epoch_samples=5496.2
+# Sit-Stationary: n=3635, p=0.126369, expected_epoch_samples=4061.1
+# Transition-LayBed-to-Sit: n=1283, p=0.075076, expected_epoch_samples=2412.7
+# Transition-LayFloor-to-Stand: n=2633, p=0.107551, expected_epoch_samples=3456.4
+# Transition-Sit-to-LayBed: n=1037, p=0.067496, expected_epoch_samples=2169.1
+# Transition-Sit-to-Stand: n=1042, p=0.067658, expected_epoch_samples=2174.3
+# Transition-Stand-to-Sit: n=1221, p=0.073239, expected_epoch_samples=2353.7
+# Walking: n=13602, p=0.244449, expected_epoch_samples=7855.9
 class_sample_strategy = 'sqrt'
 class_sample_power = 0.5
-epoch_size = 38546
+epoch_size = 32137
 
 generate_pose_target = dict(
     joint=dict(with_kp=True, with_limb=False),
@@ -173,7 +173,7 @@ test_evaluation = dict(
 )
 log_config = dict(interval=20, hooks=[dict(type='TextLoggerHook')])
 log_level = 'INFO'
-load_from = 'work_dirs/thesis/s6/trimmed/fold_a/t4/joint/latest.pth'
+load_from = 'work_dirs/thesis/s6/trimmed/fold_a/t4/joint/best_macro_f1_epoch_11.pth'
 resume_from = None
 auto_resume = False
 work_dir = './work_dirs/thesis/s6/continuous_hard/fold_a/t4/joint'

@@ -3,7 +3,7 @@
   "pkl_dir": "data/radar_v4/pyskl/8111teacher4_s6",
   "output_dir": "thesis/s6/configs/trimmed",
   "folds": [
-    "b"
+    "c"
   ],
   "teachers": [
     "t1",
@@ -12,7 +12,7 @@
     "t4"
   ],
   "streams": [
-    "joint"
+    "limb"
   ],
   "total_epochs": 20,
   "lr": 0.2,
@@ -42,9 +42,9 @@
     "Walking"
   ],
   "configs": [
-    "thesis/s6/configs/trimmed/fold_b/t1/joint.py",
-    "thesis/s6/configs/trimmed/fold_b/t2/joint.py",
-    "thesis/s6/configs/trimmed/fold_b/t3/joint.py",
-    "thesis/s6/configs/trimmed/fold_b/t4/joint.py"
+    "thesis/s6/configs/trimmed/fold_c/t1/limb.py",
+    "thesis/s6/configs/trimmed/fold_c/t2/limb.py",
+    "thesis/s6/configs/trimmed/fold_c/t3/limb.py",
+    "thesis/s6/configs/trimmed/fold_c/t4/limb.py"
   ]
 }
