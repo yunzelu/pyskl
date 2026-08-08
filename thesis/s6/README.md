@@ -109,3 +109,28 @@ The MC file stores calibrated per-pass probabilities with shape `[N, K, C]`,
 the calibrated predictive mean, hard pseudo labels from the predictive mean,
 and uncertainty quantities. Set `SAVE_MC_LOGITS=1` for the MC job if raw MC
 logits also need to be stored.
+
+Fuse joint and limb pseudo labels with equal stream weights:
+
+```bash
+sbatch thesis/s6/fuse_pseudo_two_streams.sh
+```
+
+By default this writes hard fused labels using:
+
+```text
+fused_logits = 0.5 * joint_logits + 0.5 * limb_logits
+fused_label = argmax(fused_logits)
+```
+
+To fuse every exported pseudo-label variant:
+
+```bash
+FUSION_MODES="all" sbatch thesis/s6/fuse_pseudo_two_streams.sh
+```
+
+Fused outputs are stored under:
+
+```text
+work_dirs/thesis/s6/pseudo_labels/fold_<fold>/<teacher>/fusion_1to1/
+```
