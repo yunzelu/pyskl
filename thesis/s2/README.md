@@ -93,6 +93,23 @@ Run `eta=0.25` and `eta=0.75` only after the `eta=0.50` soft-target run is
 worth expanding, then re-run `select_stage2_checkpoint.py --method C` with all
 three eta values.
 
+Pure temporal soft-target Method C uses `eta=1.0`, because:
+
+```text
+q_final = (1 - eta) * one_hot(center_label) + eta * q_temporal
+```
+
+Run the full three-fold joint/limb `eta=1.0` job, then evaluate fusion and
+write summary tables:
+
+```bash
+sbatch thesis/s2/run_c_eta100_full.sh
+```
+
+This refreshes Method C outputs and summaries under `work_dirs/thesis/s2`.
+The summary tables compare the new Method C eta100 result against the existing
+Method A and B metrics.
+
 If a Slurm job is still OOM-killed, reduce loader fan-out before increasing the
 experiment scope:
 
