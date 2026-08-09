@@ -135,6 +135,27 @@ Fused outputs are stored under:
 work_dirs/thesis/s6/pseudo_labels/fold_<fold>/<teacher>/fusion_1to1/
 ```
 
+For MC pseudo labels, normalize fused mutual information using only the fused
+calibration-subject MC-MI distribution, then export pseudo-label weights:
+
+```bash
+OVERWRITE=1 sbatch thesis/s6/add_mc_mi_weights.sh
+```
+
+The default is:
+
+```text
+u_norm = min(u_mi / Q0.95(calibration_mi), 1)
+w = 0.1 + 0.9 * (1 - u_norm) ** 1
+```
+
+The output files are sidecars such as:
+
+```text
+fusion_mc_calibrated_soft_probabilities_mi_weighted_gamma1.csv
+fusion_mc_calibrated_soft_probabilities_mi_weighted_gamma1.npz
+```
+
 Build fold-level pseudo annotation pkls after fusion:
 
 ```bash
