@@ -10,9 +10,7 @@
     "limb"
   ],
   "etas": [
-    0.25,
-    0.5,
-    0.75
+    1.0
   ],
   "total_epochs": 8,
   "lr": 0.02,
@@ -160,24 +158,12 @@
       "thesis/s2/configs/fold_c/limb/posec3d_continuous_hard_B.py"
     ],
     "C": [
-      "thesis/s2/configs/fold_a/joint/posec3d_continuous_soft_C_eta025.py",
-      "thesis/s2/configs/fold_a/joint/posec3d_continuous_soft_C_eta050.py",
-      "thesis/s2/configs/fold_a/joint/posec3d_continuous_soft_C_eta075.py",
-      "thesis/s2/configs/fold_a/limb/posec3d_continuous_soft_C_eta025.py",
-      "thesis/s2/configs/fold_a/limb/posec3d_continuous_soft_C_eta050.py",
-      "thesis/s2/configs/fold_a/limb/posec3d_continuous_soft_C_eta075.py",
-      "thesis/s2/configs/fold_b/joint/posec3d_continuous_soft_C_eta025.py",
-      "thesis/s2/configs/fold_b/joint/posec3d_continuous_soft_C_eta050.py",
-      "thesis/s2/configs/fold_b/joint/posec3d_continuous_soft_C_eta075.py",
-      "thesis/s2/configs/fold_b/limb/posec3d_continuous_soft_C_eta025.py",
-      "thesis/s2/configs/fold_b/limb/posec3d_continuous_soft_C_eta050.py",
-      "thesis/s2/configs/fold_b/limb/posec3d_continuous_soft_C_eta075.py",
-      "thesis/s2/configs/fold_c/joint/posec3d_continuous_soft_C_eta025.py",
-      "thesis/s2/configs/fold_c/joint/posec3d_continuous_soft_C_eta050.py",
-      "thesis/s2/configs/fold_c/joint/posec3d_continuous_soft_C_eta075.py",
-      "thesis/s2/configs/fold_c/limb/posec3d_continuous_soft_C_eta025.py",
-      "thesis/s2/configs/fold_c/limb/posec3d_continuous_soft_C_eta050.py",
-      "thesis/s2/configs/fold_c/limb/posec3d_continuous_soft_C_eta075.py"
+      "thesis/s2/configs/fold_a/joint/posec3d_continuous_soft_C_eta100.py",
+      "thesis/s2/configs/fold_a/limb/posec3d_continuous_soft_C_eta100.py",
+      "thesis/s2/configs/fold_b/joint/posec3d_continuous_soft_C_eta100.py",
+      "thesis/s2/configs/fold_b/limb/posec3d_continuous_soft_C_eta100.py",
+      "thesis/s2/configs/fold_c/joint/posec3d_continuous_soft_C_eta100.py",
+      "thesis/s2/configs/fold_c/limb/posec3d_continuous_soft_C_eta100.py"
     ]
   }
 }

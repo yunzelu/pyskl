@@ -17,11 +17,11 @@ cd ~/projects/def-mbolic/yunzelu/pyskl/
 
 RUN_FOLDS="${RUN_FOLDS:-a b c}"
 RUN_TEACHERS="${RUN_TEACHERS:-t1 t2 t3 t4}"
-FUSION_MODES="${FUSION_MODES:-hard}"
+FUSION_MODES="${FUSION_MODES:-hard }"
 PSEUDO_ROOT="${PSEUDO_ROOT:-work_dirs/thesis/s6/pseudo_labels}"
 OUT_ROOT="${OUT_ROOT:-${PSEUDO_ROOT}}"
 JOINT_WEIGHT="${JOINT_WEIGHT:-0.5}"
-OVERWRITE="${OVERWRITE:-0}"
+OVERWRITE="${OVERWRITE:-1}"
 SKIP_MISSING="${SKIP_MISSING:-0}"
 
 ARGS=(
