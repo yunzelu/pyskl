@@ -22,7 +22,7 @@ model = dict(
 )
 
 dataset_type = 'PoseDataset'
-ann_file = f'data/radar_v4/pyskl/{pkl}.pkl'
+ann_file = f'data/radar_v4/pyskl/911/{pkl}.pkl'
 
 # COCO-17 left/right keypoint ids
 coco_left = [1, 3, 5, 7, 9, 11, 13, 15]

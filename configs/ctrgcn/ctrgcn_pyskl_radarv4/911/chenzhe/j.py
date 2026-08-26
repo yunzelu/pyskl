@@ -21,7 +21,7 @@ model = dict(
 )
 
 dataset_type = 'PoseDataset'
-ann_file = 'data/radar_v4/pyskl/radarv4_yolo26xpose_clip60_val_mia_test_chenzhe.pkl'
+ann_file = 'data/radar_v4/pyskl/911/radarv4_yolo26xpose_clip60_val_mia_test_chenzhe.pkl'
 
 # COCO-17 left/right keypoint ids
 coco_left = [1, 3, 5, 7, 9, 11, 13, 15]
