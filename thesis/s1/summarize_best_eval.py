@@ -18,6 +18,8 @@ DEFAULT_METRICS = ("top1_acc", "mean_class_accuracy", "macro_f1")
 DEFAULT_ROOTS = (
     Path("work_dirs/posec3d/911"),
     Path("work_dirs/stgcn++/911"),
+    Path("work_dirs/stgcn/911"),
+    Path("work_dirs/ctrgcn/911"),
 )
 
 
