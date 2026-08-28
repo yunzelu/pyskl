@@ -177,6 +177,70 @@ class UniformSample(UniformSampleFrames):
 
 
 @PIPELINES.register_module()
+class MonotonicUniformResample:
+    """Deterministically resample a pose sequence to a fixed length.
+
+    The transform selects nearest observations from uniformly spaced positions
+    over the complete input segment. Selected indices are non-decreasing and
+    retain the first and last observations when the segment has at least two
+    frames. Short segments are stretched by monotonic repetition.
+    """
+
+    def __init__(self, clip_len, num_clips=1):
+        self.clip_len = int(clip_len)
+        self.num_clips = int(num_clips)
+        if self.clip_len <= 0:
+            raise ValueError('clip_len must be positive')
+        if self.num_clips != 1:
+            raise ValueError(
+                'MonotonicUniformResample is defined for num_clips=1')
+
+    def _get_indices(self, num_frames):
+        if num_frames <= 0:
+            raise ValueError(
+                'Cannot monotonic-resample an empty pose segment')
+        if self.clip_len == 1:
+            return np.zeros(1, dtype=np.int64)
+        if num_frames == 1:
+            return np.zeros(self.clip_len, dtype=np.int64)
+
+        positions = (
+            np.arange(self.clip_len, dtype=np.float64)
+            * float(num_frames - 1)
+            / float(self.clip_len - 1)
+        )
+        indices = np.floor(positions + 0.5).astype(np.int64)
+        indices[0] = 0
+        indices[-1] = num_frames - 1
+        indices = np.maximum.accumulate(indices)
+        return indices
+
+    def __call__(self, results):
+        num_frames = int(results['total_frames'])
+        if 'keypoint' in results:
+            assert num_frames == results['keypoint'].shape[1]
+
+        inds = self._get_indices(num_frames)
+        start_index = results['start_index']
+        results['frame_inds'] = inds + start_index
+        results['clip_len'] = self.clip_len
+        results['frame_interval'] = None
+        results['num_clips'] = self.num_clips
+        results['monotonic_resample_source_indices'] = inds
+        return results
+
+    def __repr__(self):
+        return (
+            f'{self.__class__.__name__}('
+            f'clip_len={self.clip_len}, num_clips={self.num_clips})')
+
+
+@PIPELINES.register_module()
+class DeterministicMonotonicUniformResample(MonotonicUniformResample):
+    pass
+
+
+@PIPELINES.register_module()
 class UniformSampleDecode:
 
     def __init__(self, clip_len, num_clips=1, p_interval=1, seed=255):

@@ -48,6 +48,8 @@ def build_dataloader(dataset,
                      drop_last=False,
                      pin_memory=True,
                      persistent_workers=False,
+                     sampler_indices_output_dir=None,
+                     sampler_indices_output_prefix='sampled_indices',
                      **kwargs):
     """Build PyTorch DataLoader.
 
@@ -91,7 +93,9 @@ def build_dataloader(dataset,
             class_sample_power=dataset.class_sample_power,
             epoch_size=dataset.epoch_size,
             shuffle=shuffle,
-            seed=seed)
+            seed=seed,
+            sampler_indices_output_dir=sampler_indices_output_dir,
+            sampler_indices_output_prefix=sampler_indices_output_prefix)
     elif hasattr(dataset, 'class_prob') and dataset.class_prob is not None:
         sampler = ClassSpecificDistributedSampler(
             dataset,

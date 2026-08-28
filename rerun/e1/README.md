@@ -1,0 +1,78 @@
+# E1 Skeleton Training-Inference Alignment
+
+This rerun experiment compares activity-aligned skeleton training with
+activity-aligned versus continuous-window evaluation.
+
+Implemented conditions:
+
+- A1: train on activity-aligned samples, validate on activity-aligned samples,
+  evaluate on activity-aligned test samples.
+- A2: use the A1 activity-aligned checkpoint and evaluate on continuous-window
+  test samples.
+
+Condition B is intentionally not generated in this step. It requires a
+continuous-window fine-tuning stage initialized from the selected A checkpoint.
+
+## Generate Configs
+
+```powershell
+python rerun/e1/generate_stgcnpp_configs.py --overwrite
+```
+
+Generated config root:
+
+```text
+configs/stgcn++/stgcn++_radarv4/rerun/e1
+```
+
+Generated jobs:
+
+```text
+rerun/e1/slurm/run_fold_a.sh
+rerun/e1/slurm/run_fold_b.sh
+rerun/e1/slurm/run_fold_c.sh
+```
+
+## Training Protocol
+
+Each A1 config uses:
+
+- ST-GCN++ with `num_person=1`
+- `GCNHead` with `dropout=0.5`
+- `num_classes=9`
+- `CrossEntropyLoss` without class weights
+- `videos_per_gpu=16`
+- `workers_per_gpu=2`
+- `lr=0.05`
+- `GPUS=4` in the generated job scripts
+- `total_epochs=20`
+- validation checkpoint selection by `macro_f1`
+
+The training pipeline is:
+
+```python
+Flip -> PreNormalize2D(mode='auto') -> GenSkeFeat -> MonotonicUniformResample(60)
+-> PoseDecode -> FormatGCNInput(num_person=1)
+```
+
+Validation and test omit `Flip` and use the same deterministic monotonic
+resampling.
+
+## Square-Root Sampler
+
+Training uses `class_sample_strategy='sqrt'` with `epoch_size=N_train`.
+The sampler assigns each sample weight `1 / sqrt(n_yi)` and samples with
+replacement. Validation and test datasets do not use the sampler.
+
+For reproducibility, run the jobs with the same seed for joint and bone streams.
+The generated jobs default to `SEED=42`. Per-epoch sampled index sequences are
+written under each A1 work directory:
+
+```text
+work_dirs/rerun/e1/fold_<fold>/<stream>/a1_activity_aligned/sampler_indices
+```
+
+With 4-GPU distributed training, PYSKL pads the rank slices when `N_train` is not
+divisible by 4. The saved `sampled_indices` field is the requested natural
+`N_train` sequence; `ddp_padded_indices` records the padded sequence actually
+split across ranks.

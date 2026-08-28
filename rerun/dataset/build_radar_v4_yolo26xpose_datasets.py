@@ -584,7 +584,7 @@ def build_activity_aligned(sessions: list[SessionData]) -> ProtocolResult:
             )
             row_positions = np.flatnonzero(mask)
             if row_positions.size == 0:
-                stats["dropped_segments_by_reason"]["no_detected_frames_after_preprocess"] += 1
+                stats["dropped_segments_by_reason"]["no_valid_detection_in_segment"] += 1
                 stats["dropped_segments_by_label"][str(raw_label)] += 1
                 continue
 
