@@ -88,3 +88,79 @@ With 4-GPU distributed training, PYSKL pads the rank slices when `N_train` is no
 divisible by 4. The saved `sampled_indices` field is the requested natural
 `N_train` sequence; `ddp_padded_indices` records the padded sequence actually
 split across ranks.
+
+## Result Summary
+
+After the three folds finish for both streams, generate the joint/bone/fusion
+summary with:
+
+```powershell
+python rerun/e1/summarize_results.py
+```
+
+The script reads `best_pred.pkl` and `best_eval.json` from
+`work_dirs/rerun/e1`, verifies the saved single-stream metrics, fuses joint and
+bone as `0.5 * (joint_probability + bone_probability)`, and writes:
+
+```text
+rerun/e1/reports/e1_fold_metrics.csv
+rerun/e1/reports/e1_mean_sd.csv
+rerun/e1/reports/e1_summary.json
+rerun/e1/reports/e1_summary.md
+rerun/e1/reports/e1_continuous_segmental_fold_metrics.csv
+rerun/e1/reports/e1_continuous_segmental_recording_metrics.csv
+rerun/e1/reports/e1_continuous_segmental_mean_sd.csv
+rerun/e1/reports/e1_continuous_segmental_summary.json
+rerun/e1/reports/e1_continuous_segmental_summary.md
+```
+
+Fusion predictions and metrics are written under
+`work_dirs/rerun/e1/fold_<fold>/fusion/<condition>/`.
+
+## Continuous Segmental Metrics
+
+The main summary script also evaluates continuous-window conditions A2 and B
+with MS-TCN-style segmental metrics:
+
+- normalized Edit score
+- segmental F1@10
+- segmental F1@25
+- segmental F1@50
+
+This does not require rerunning inference. The saved `best_pred.pkl` files
+provide the per-window class probabilities, and the continuous-window pkl
+provides the matching test order, `session_name`, `window_row_start`, and
+`center_source_frame` metadata.
+
+Protocol details:
+
+- Treat every `session_name` as an independent temporal sequence.
+- Never concatenate windows from different recordings.
+- Sort windows within a recording by `window_row_start`, then
+  `center_source_frame`.
+- Collapse consecutive identical ground-truth labels into ground-truth
+  segments.
+- Collapse consecutive identical predicted labels into predicted segments.
+- Ignore background labels if explicitly provided; the current 9-class E1 label
+  set has no background class by default.
+- Compute segment IoU using ordered window-center sequence indices by default,
+  matching the official sequence-label evaluation convention.
+- Match predicted and ground-truth segments only within the same recording and
+  only when the class labels match.
+- For each threshold, sum TP, FP, and FN counts across recordings in the fold,
+  then compute one fold-level F1 score.
+- Compute normalized Levenshtein Edit per recording after collapsing labels,
+  then average recording Edit scores within the fold.
+
+Standalone segmental evaluation can be run with:
+
+```powershell
+python rerun/e1/evaluate_continuous_segmental.py
+```
+
+Optional flags:
+
+```powershell
+python rerun/e1/evaluate_continuous_segmental.py --background-labels <label-or-id>
+python rerun/e1/evaluate_continuous_segmental.py --overlap-axis center_source_frame
+```

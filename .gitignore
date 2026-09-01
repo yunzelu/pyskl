@@ -144,3 +144,6 @@ pipeline/csv_input/*.jpg
 pipeline/csv_input/*.png
 pipeline/csv_input/*.csv
 pipeline/csv_input/*.json
+
+rerun/**/*.csv
+rerun/**/*.json
