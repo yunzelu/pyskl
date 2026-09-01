@@ -14,17 +14,40 @@
     "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_c\\bone\\b_continuous_window.py"
   ],
   "jobs": [
+    "rerun\\e1\\slurm\\run_a1_a2_fold_a_joint.sh",
+    "rerun\\e1\\slurm\\run_b_fold_a_joint.sh",
+    "rerun\\e1\\slurm\\run_a1_a2_fold_a_bone.sh",
+    "rerun\\e1\\slurm\\run_b_fold_a_bone.sh",
+    "rerun\\e1\\slurm\\run_a1_a2_fold_b_joint.sh",
+    "rerun\\e1\\slurm\\run_b_fold_b_joint.sh",
+    "rerun\\e1\\slurm\\run_a1_a2_fold_b_bone.sh",
+    "rerun\\e1\\slurm\\run_b_fold_b_bone.sh",
+    "rerun\\e1\\slurm\\run_a1_a2_fold_c_joint.sh",
+    "rerun\\e1\\slurm\\run_b_fold_c_joint.sh",
+    "rerun\\e1\\slurm\\run_a1_a2_fold_c_bone.sh",
+    "rerun\\e1\\slurm\\run_b_fold_c_bone.sh"
+  ],
+  "a1_a2_jobs": [
+    "rerun\\e1\\slurm\\run_a1_a2_fold_a_joint.sh",
+    "rerun\\e1\\slurm\\run_a1_a2_fold_a_bone.sh",
+    "rerun\\e1\\slurm\\run_a1_a2_fold_b_joint.sh",
+    "rerun\\e1\\slurm\\run_a1_a2_fold_b_bone.sh",
+    "rerun\\e1\\slurm\\run_a1_a2_fold_c_joint.sh",
+    "rerun\\e1\\slurm\\run_a1_a2_fold_c_bone.sh"
+  ],
+  "b_jobs": [
+    "rerun\\e1\\slurm\\run_b_fold_a_joint.sh",
+    "rerun\\e1\\slurm\\run_b_fold_a_bone.sh",
+    "rerun\\e1\\slurm\\run_b_fold_b_joint.sh",
+    "rerun\\e1\\slurm\\run_b_fold_b_bone.sh",
+    "rerun\\e1\\slurm\\run_b_fold_c_joint.sh",
+    "rerun\\e1\\slurm\\run_b_fold_c_bone.sh"
+  ],
+  "deleted_legacy_configs": [],
+  "deleted_legacy_jobs": [
     "rerun\\e1\\slurm\\run_fold_a.sh",
     "rerun\\e1\\slurm\\run_fold_b.sh",
     "rerun\\e1\\slurm\\run_fold_c.sh"
-  ],
-  "deleted_legacy_configs": [
-    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_a\\joint\\a2_continuous_window.py",
-    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_a\\bone\\a2_continuous_window.py",
-    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_b\\joint\\a2_continuous_window.py",
-    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_b\\bone\\a2_continuous_window.py",
-    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_c\\joint\\a2_continuous_window.py",
-    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_c\\bone\\a2_continuous_window.py"
   ],
   "folds": {
     "a": {

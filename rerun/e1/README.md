@@ -30,10 +30,13 @@ configs/stgcn++/stgcn++_radarv4/rerun/e1
 Generated jobs:
 
 ```text
-rerun/e1/slurm/run_fold_a.sh
-rerun/e1/slurm/run_fold_b.sh
-rerun/e1/slurm/run_fold_c.sh
+rerun/e1/slurm/run_a1_a2_fold_<fold>_<stream>.sh
+rerun/e1/slurm/run_b_fold_<fold>_<stream>.sh
 ```
+
+There are 12 generated jobs total: A1+A2 and B for each fold
+(`a`, `b`, `c`) and stream (`joint`, `bone`). A1+A2 jobs request 4 hours.
+B jobs request 6 hours.
 
 ## Training Protocol
 
@@ -71,8 +74,10 @@ The sampler assigns each sample weight `1 / sqrt(n_yi)` and samples with
 replacement. Validation and test datasets do not use the sampler.
 
 For reproducibility, run the jobs with the same seed for joint and bone streams.
-The generated jobs default to `SEED=42`. Per-epoch sampled index sequences are
-written under each training work directory:
+The generated jobs default to `SEED=42`. A1+A2 jobs train A1 and then evaluate
+the selected A1 checkpoint on continuous windows; B jobs train directly on
+continuous windows. Per-epoch sampled index sequences are written under each
+training work directory:
 
 ```text
 work_dirs/rerun/e1/fold_<fold>/<stream>/a1_activity_aligned/sampler_indices

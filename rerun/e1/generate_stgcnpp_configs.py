@@ -358,14 +358,14 @@ def write_text(path: Path, text: str, overwrite: bool) -> None:
     path.write_text(text, encoding="utf-8", newline="\n")
 
 
-def job_text(fold: str) -> str:
+def slurm_header(condition: str, fold: str, stream: str, time_limit: str) -> str:
     return f"""#!/bin/bash
 #SBATCH --account=def-mbolic
 #SBATCH --gpus-per-node=a100:4
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=62G
-#SBATCH --time=24:00:00
-#SBATCH --job-name=e1_fold_{fold}
+#SBATCH --time={time_limit}
+#SBATCH --job-name=e1_{condition}_fold_{fold}_{stream}
 #SBATCH --output=rerun/e1/slurm/%x_%j.out
 #SBATCH --mail-user=yunzelu@outlook.com
 #SBATCH --mail-type=BEGIN,END,FAIL
@@ -379,34 +379,42 @@ cd ~/projects/def-mbolic/yunzelu/pyskl/
 
 GPUS="${{GPUS:-4}}"
 SEED="${{SEED:-42}}"
-STREAMS="${{STREAMS:-joint bone}}"
 FOLD="{fold}"
+STREAM="{stream}"
 CONFIG_ROOT="configs/stgcn++/stgcn++_radarv4/rerun/e1/fold_${{FOLD}}"
 WORK_ROOT="work_dirs/rerun/e1/fold_${{FOLD}}"
+"""
 
-for stream in ${{STREAMS}}; do
-  a1_config="${{CONFIG_ROOT}}/${{stream}}/a1_activity_aligned.py"
-  b_config="${{CONFIG_ROOT}}/${{stream}}/b_continuous_window.py"
-  a1_work_dir="${{WORK_ROOT}}/${{stream}}/a1_activity_aligned"
-  a2_eval_dir="${{WORK_ROOT}}/${{stream}}/a2_activity_checkpoint_on_continuous"
 
-  bash tools/dist_train.sh "${{a1_config}}" "${{GPUS}}" --validate --test-best --seed "${{SEED}}" --deterministic
+def a1_a2_job_text(fold: str, stream: str) -> str:
+    return slurm_header("a1_a2", fold, stream, "04:00:00") + f"""
+a1_config="${{CONFIG_ROOT}}/${{STREAM}}/a1_activity_aligned.py"
+b_config="${{CONFIG_ROOT}}/${{STREAM}}/b_continuous_window.py"
+a1_work_dir="${{WORK_ROOT}}/${{STREAM}}/a1_activity_aligned"
+a2_eval_dir="${{WORK_ROOT}}/${{STREAM}}/a2_activity_checkpoint_on_continuous"
 
-  mapfile -t best_ckpts < <(find "${{a1_work_dir}}" -maxdepth 1 -name 'best_macro_f1_epoch_*.pth' | sort)
-  if [[ "${{#best_ckpts[@]}}" -ne 1 ]]; then
-    echo "[ERROR] Expected one best_macro_f1 checkpoint in ${{a1_work_dir}}, found ${{#best_ckpts[@]}}" >&2
-    printf '%s\\n' "${{best_ckpts[@]}}" >&2
-    exit 1
-  fi
-  best_ckpt="${{best_ckpts[0]}}"
+bash tools/dist_train.sh "${{a1_config}}" "${{GPUS}}" --validate --test-best --seed "${{SEED}}" --deterministic
 
-  mkdir -p "${{a2_eval_dir}}"
-  bash tools/dist_test.sh "${{b_config}}" "${{best_ckpt}}" "${{GPUS}}" \\
-    --out "${{a2_eval_dir}}/best_pred.pkl" \\
-    --eval-out "${{a2_eval_dir}}/best_eval.json"
+mapfile -t best_ckpts < <(find "${{a1_work_dir}}" -maxdepth 1 -name 'best_macro_f1_epoch_*.pth' | sort)
+if [[ "${{#best_ckpts[@]}}" -ne 1 ]]; then
+  echo "[ERROR] Expected one best_macro_f1 checkpoint in ${{a1_work_dir}}, found ${{#best_ckpts[@]}}" >&2
+  printf '%s\\n' "${{best_ckpts[@]}}" >&2
+  exit 1
+fi
+best_ckpt="${{best_ckpts[0]}}"
 
-  bash tools/dist_train.sh "${{b_config}}" "${{GPUS}}" --validate --test-best --seed "${{SEED}}" --deterministic
-done
+mkdir -p "${{a2_eval_dir}}"
+bash tools/dist_test.sh "${{b_config}}" "${{best_ckpt}}" "${{GPUS}}" \\
+  --out "${{a2_eval_dir}}/best_pred.pkl" \\
+  --eval-out "${{a2_eval_dir}}/best_eval.json"
+"""
+
+
+def b_job_text(fold: str, stream: str) -> str:
+    return slurm_header("b", fold, stream, "06:00:00") + f"""
+b_config="${{CONFIG_ROOT}}/${{STREAM}}/b_continuous_window.py"
+
+bash tools/dist_train.sh "${{b_config}}" "${{GPUS}}" --validate --test-best --seed "${{SEED}}" --deterministic
 """
 
 
@@ -423,9 +431,16 @@ def generate(
     outputs: dict[str, Any] = {
         "configs": [],
         "jobs": [],
+        "a1_a2_jobs": [],
+        "b_jobs": [],
         "deleted_legacy_configs": [],
+        "deleted_legacy_jobs": [],
         "folds": {},
     }
+    for legacy_job_path in job_root.glob("run_fold_*.sh"):
+        legacy_job_path.unlink()
+        outputs["deleted_legacy_jobs"].append(str(legacy_job_path))
+
     for fold in folds:
         if fold not in FOLDS:
             raise ValueError(f"Unknown fold {fold!r}; expected one of {sorted(FOLDS)}")
@@ -467,9 +482,14 @@ def generate(
             )
             outputs["configs"].extend([str(a1_path), str(b_path)])
 
-        job_path = job_root / f"run_fold_{fold}.sh"
-        write_text(job_path, job_text(fold), overwrite=overwrite)
-        outputs["jobs"].append(str(job_path))
+        for stream in streams:
+            a_job_path = job_root / f"run_a1_a2_fold_{fold}_{stream}.sh"
+            b_job_path = job_root / f"run_b_fold_{fold}_{stream}.sh"
+            write_text(a_job_path, a1_a2_job_text(fold, stream), overwrite=overwrite)
+            write_text(b_job_path, b_job_text(fold, stream), overwrite=overwrite)
+            outputs["jobs"].extend([str(a_job_path), str(b_job_path)])
+            outputs["a1_a2_jobs"].append(str(a_job_path))
+            outputs["b_jobs"].append(str(b_job_path))
 
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(
@@ -505,7 +525,7 @@ def main() -> None:
         overwrite=args.overwrite,
     )
     print(f"[DONE] wrote E1 configs under {args.config_root}")
-    print(f"[DONE] wrote E1 fold jobs under {args.job_root}")
+    print(f"[DONE] wrote E1 SLURM jobs under {args.job_root}")
     print(f"[DONE] wrote generation report to {args.report_path}")
 
 
