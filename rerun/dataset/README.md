@@ -106,9 +106,27 @@ Continuous-window samples:
 
 Windows whose center label is outside the final label set are not emitted.
 
+Continuous-window triangular temporal-composition samples:
+
+- Use exactly the same windows, validity checks, hard center labels, and splits
+  as `continuous_window_w60_s12`.
+- Add `label_soft_triangular` beside the hard center `label`.
+- For each retained frame position, use the original `frame_idx` to find the
+  matching `annotation_info/segments` label.
+- Use normalized symmetric Bartlett weights:
+  `w_t proportional to 1 - abs(2*t - (L - 1)) / (L - 1)`.
+- For `L=60`, positions 0 and 59 have zero mass and positions 29 and 30 share
+  the two equal center peaks.
+- Frames whose labels are outside the final nine classes, such as `DELETE`,
+  kneeling labels, or no covering segment, are ignored.
+- The remaining valid triangular mass is renormalized, so
+  `sum(label_soft_triangular) == 1`.
+- Because the center frame must have a valid final label, zero valid target
+  mass is treated as an error.
+
 ## Folds
 
-The same subject-wise folds are written for both protocols:
+The same subject-wise folds are written for all protocols:
 
 | Fold | Train | Validation | Calibration | Test |
 | --- | --- | --- | --- | --- |
@@ -124,6 +142,9 @@ Pkl names:
 - `radarv4_yolo26xpose_continuous_window_w60_s12_fold_a.pkl`
 - `radarv4_yolo26xpose_continuous_window_w60_s12_fold_b.pkl`
 - `radarv4_yolo26xpose_continuous_window_w60_s12_fold_c.pkl`
+- `radarv4_yolo26xpose_continuous_window_w60_s12_triangular_fold_a.pkl`
+- `radarv4_yolo26xpose_continuous_window_w60_s12_triangular_fold_b.pkl`
+- `radarv4_yolo26xpose_continuous_window_w60_s12_triangular_fold_c.pkl`
 
 Each pkl follows the PYSKL format:
 

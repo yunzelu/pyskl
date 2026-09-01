@@ -62,6 +62,12 @@ CONDITIONS = [
         pkl_protocol_dir="continuous_window_w60_s12",
         pkl_stem="radarv4_yolo26xpose_continuous_window_w60_s12_fold_{fold}.pkl",
     ),
+    Condition(
+        key="c",
+        result_dir="c_triangular_temporal_composition",
+        pkl_protocol_dir="continuous_window_w60_s12_triangular",
+        pkl_stem="radarv4_yolo26xpose_continuous_window_w60_s12_triangular_fold_{fold}.pkl",
+    ),
 ]
 
 
@@ -163,6 +169,29 @@ def result_paths(work_root: Path, fold: str, stream: str, condition: Condition) 
     return base / "best_pred.pkl", base / "best_eval.json"
 
 
+def active_conditions(work_root: Path) -> list[Condition]:
+    active: list[Condition] = []
+    expected_count = len(FOLDS) * len(STREAMS)
+    for condition in CONDITIONS:
+        pred_paths = [
+            result_paths(work_root, fold, stream, condition)[0]
+            for fold in FOLDS
+            for stream in STREAMS
+        ]
+        existing_count = sum(path.exists() for path in pred_paths)
+        if existing_count == 0:
+            continue
+        if existing_count != expected_count:
+            missing = [str(path) for path in pred_paths if not path.exists()]
+            raise FileNotFoundError(
+                f"Partial results for condition {condition.key}: "
+                f"{existing_count}/{expected_count} best_pred.pkl files found. "
+                f"Missing examples: {missing[:3]}"
+            )
+        active.append(condition)
+    return active
+
+
 def add_single_stream_rows(
     rows: list[dict[str, Any]],
     work_root: Path,
@@ -256,7 +285,12 @@ def aggregate_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         grouped[(str(row["condition"]), str(row["stream"]))].append(row)
 
     summary: list[dict[str, Any]] = []
-    for condition in [item.key for item in CONDITIONS]:
+    present_conditions = [
+        condition.key
+        for condition in CONDITIONS
+        if any(str(row["condition"]) == condition.key for row in rows)
+    ]
+    for condition in present_conditions:
         for stream in [*STREAMS, "fusion"]:
             fold_rows = grouped[(condition, stream)]
             if len(fold_rows) != len(FOLDS):
@@ -344,7 +378,8 @@ def markdown_report(
                 "## Continuous Segmental Metrics",
                 "",
                 "Segmental metrics are computed only for continuous-window evaluation",
-                "conditions A2 and B. Each recording is evaluated independently;",
+                "conditions A2, B, and C when available. Each recording is",
+                "evaluated independently;",
                 "segmental F1 pools TP, FP, and FN counts across recordings within",
                 "a fold, while Edit is normalized per recording and then averaged.",
                 "",
@@ -482,7 +517,11 @@ def temporal_support_report(data_root: Path) -> dict[str, Any]:
 
 def summarize(args: argparse.Namespace) -> None:
     rows: list[dict[str, Any]] = []
-    for condition in CONDITIONS:
+    conditions = active_conditions(args.work_root)
+    if not conditions:
+        raise FileNotFoundError(f"No E1 best_pred.pkl files found under {args.work_root}")
+
+    for condition in conditions:
         for fold in FOLDS:
             score_by_stream = add_single_stream_rows(
                 rows=rows,

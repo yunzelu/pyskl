@@ -2,30 +2,42 @@
   "configs": [
     "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_a\\joint\\a1_activity_aligned.py",
     "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_a\\joint\\b_continuous_window.py",
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_a\\joint\\c_triangular_temporal_composition.py",
     "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_a\\bone\\a1_activity_aligned.py",
     "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_a\\bone\\b_continuous_window.py",
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_a\\bone\\c_triangular_temporal_composition.py",
     "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_b\\joint\\a1_activity_aligned.py",
     "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_b\\joint\\b_continuous_window.py",
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_b\\joint\\c_triangular_temporal_composition.py",
     "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_b\\bone\\a1_activity_aligned.py",
     "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_b\\bone\\b_continuous_window.py",
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_b\\bone\\c_triangular_temporal_composition.py",
     "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_c\\joint\\a1_activity_aligned.py",
     "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_c\\joint\\b_continuous_window.py",
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_c\\joint\\c_triangular_temporal_composition.py",
     "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_c\\bone\\a1_activity_aligned.py",
-    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_c\\bone\\b_continuous_window.py"
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_c\\bone\\b_continuous_window.py",
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_c\\bone\\c_triangular_temporal_composition.py"
   ],
   "jobs": [
     "rerun\\e1\\slurm\\run_a1_a2_fold_a_joint.sh",
     "rerun\\e1\\slurm\\run_b_fold_a_joint.sh",
+    "rerun\\e1\\slurm\\run_c_fold_a_joint.sh",
     "rerun\\e1\\slurm\\run_a1_a2_fold_a_bone.sh",
     "rerun\\e1\\slurm\\run_b_fold_a_bone.sh",
+    "rerun\\e1\\slurm\\run_c_fold_a_bone.sh",
     "rerun\\e1\\slurm\\run_a1_a2_fold_b_joint.sh",
     "rerun\\e1\\slurm\\run_b_fold_b_joint.sh",
+    "rerun\\e1\\slurm\\run_c_fold_b_joint.sh",
     "rerun\\e1\\slurm\\run_a1_a2_fold_b_bone.sh",
     "rerun\\e1\\slurm\\run_b_fold_b_bone.sh",
+    "rerun\\e1\\slurm\\run_c_fold_b_bone.sh",
     "rerun\\e1\\slurm\\run_a1_a2_fold_c_joint.sh",
     "rerun\\e1\\slurm\\run_b_fold_c_joint.sh",
+    "rerun\\e1\\slurm\\run_c_fold_c_joint.sh",
     "rerun\\e1\\slurm\\run_a1_a2_fold_c_bone.sh",
-    "rerun\\e1\\slurm\\run_b_fold_c_bone.sh"
+    "rerun\\e1\\slurm\\run_b_fold_c_bone.sh",
+    "rerun\\e1\\slurm\\run_c_fold_c_bone.sh"
   ],
   "a1_a2_jobs": [
     "rerun\\e1\\slurm\\run_a1_a2_fold_a_joint.sh",
@@ -43,16 +55,21 @@
     "rerun\\e1\\slurm\\run_b_fold_c_joint.sh",
     "rerun\\e1\\slurm\\run_b_fold_c_bone.sh"
   ],
-  "deleted_legacy_configs": [],
-  "deleted_legacy_jobs": [
-    "rerun\\e1\\slurm\\run_fold_a.sh",
-    "rerun\\e1\\slurm\\run_fold_b.sh",
-    "rerun\\e1\\slurm\\run_fold_c.sh"
+  "c_jobs": [
+    "rerun\\e1\\slurm\\run_c_fold_a_joint.sh",
+    "rerun\\e1\\slurm\\run_c_fold_a_bone.sh",
+    "rerun\\e1\\slurm\\run_c_fold_b_joint.sh",
+    "rerun\\e1\\slurm\\run_c_fold_b_bone.sh",
+    "rerun\\e1\\slurm\\run_c_fold_c_joint.sh",
+    "rerun\\e1\\slurm\\run_c_fold_c_bone.sh"
   ],
+  "deleted_legacy_configs": [],
+  "deleted_legacy_jobs": [],
   "folds": {
     "a": {
       "activity_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\activity_aligned\\radarv4_yolo26xpose_activity_aligned_fold_a.pkl",
       "continuous_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\continuous_window_w60_s12\\radarv4_yolo26xpose_continuous_window_w60_s12_fold_a.pkl",
+      "triangular_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\continuous_window_w60_s12_triangular\\radarv4_yolo26xpose_continuous_window_w60_s12_triangular_fold_a.pkl",
       "activity_train_counts": {
         "lie-stationary": 941,
         "sit-stationary": 497,
@@ -76,11 +93,24 @@
         "transition-sit-to-stand": 1402,
         "transition-stand-to-sit": 1809
       },
-      "continuous_epoch_size": 43293
+      "continuous_epoch_size": 43293,
+      "triangular_train_counts": {
+        "lie-stationary": 8705,
+        "sit-stationary": 4199,
+        "walk": 18332,
+        "fall": 1452,
+        "transition-lie-to-sit": 1888,
+        "transition-lie-to-stand": 3904,
+        "transition-sit-to-lie": 1602,
+        "transition-sit-to-stand": 1402,
+        "transition-stand-to-sit": 1809
+      },
+      "triangular_epoch_size": 43293
     },
     "b": {
       "activity_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\activity_aligned\\radarv4_yolo26xpose_activity_aligned_fold_b.pkl",
       "continuous_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\continuous_window_w60_s12\\radarv4_yolo26xpose_continuous_window_w60_s12_fold_b.pkl",
+      "triangular_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\continuous_window_w60_s12_triangular\\radarv4_yolo26xpose_continuous_window_w60_s12_triangular_fold_b.pkl",
       "activity_train_counts": {
         "lie-stationary": 887,
         "sit-stationary": 468,
@@ -104,11 +134,24 @@
         "transition-sit-to-stand": 1496,
         "transition-stand-to-sit": 2002
       },
-      "continuous_epoch_size": 43742
+      "continuous_epoch_size": 43742,
+      "triangular_train_counts": {
+        "lie-stationary": 8086,
+        "sit-stationary": 4476,
+        "walk": 19306,
+        "fall": 1393,
+        "transition-lie-to-sit": 1789,
+        "transition-lie-to-stand": 3538,
+        "transition-sit-to-lie": 1656,
+        "transition-sit-to-stand": 1496,
+        "transition-stand-to-sit": 2002
+      },
+      "triangular_epoch_size": 43742
     },
     "c": {
       "activity_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\activity_aligned\\radarv4_yolo26xpose_activity_aligned_fold_c.pkl",
       "continuous_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\continuous_window_w60_s12\\radarv4_yolo26xpose_continuous_window_w60_s12_fold_c.pkl",
+      "triangular_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\continuous_window_w60_s12_triangular\\radarv4_yolo26xpose_continuous_window_w60_s12_triangular_fold_c.pkl",
       "activity_train_counts": {
         "lie-stationary": 892,
         "sit-stationary": 471,
@@ -132,7 +175,19 @@
         "transition-sit-to-stand": 1528,
         "transition-stand-to-sit": 1952
       },
-      "continuous_epoch_size": 43335
+      "continuous_epoch_size": 43335,
+      "triangular_train_counts": {
+        "lie-stationary": 8015,
+        "sit-stationary": 4473,
+        "walk": 18686,
+        "fall": 1414,
+        "transition-lie-to-sit": 1766,
+        "transition-lie-to-stand": 3920,
+        "transition-sit-to-lie": 1581,
+        "transition-sit-to-stand": 1528,
+        "transition-stand-to-sit": 1952
+      },
+      "triangular_epoch_size": 43335
     }
   }
 }

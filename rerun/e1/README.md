@@ -11,6 +11,9 @@ Implemented conditions:
   test samples using the B continuous-window config.
 - B: train on continuous-window samples, validate on continuous-window samples,
   evaluate on continuous-window test samples.
+- C: train on continuous-window samples with triangular temporal-composition
+  soft targets, validate and evaluate on continuous-window samples with hard
+  center labels.
 
 A2 does not have a separate config file. Its test dataset, preprocessing, and
 metrics are the same as B; the only difference is the checkpoint being loaded.
@@ -32,11 +35,12 @@ Generated jobs:
 ```text
 rerun/e1/slurm/run_a1_a2_fold_<fold>_<stream>.sh
 rerun/e1/slurm/run_b_fold_<fold>_<stream>.sh
+rerun/e1/slurm/run_c_fold_<fold>_<stream>.sh
 ```
 
-There are 12 generated jobs total: A1+A2 and B for each fold
+There are 18 generated jobs total: A1+A2, B, and C for each fold
 (`a`, `b`, `c`) and stream (`joint`, `bone`). A1+A2 jobs request 4 hours.
-B jobs request 6 hours.
+B and C jobs request 6 hours.
 
 ## Training Protocol
 
@@ -54,8 +58,10 @@ Each A1 config uses:
 - validation checkpoint selection by `macro_f1`
 - metrics `macro_f1` and top-1 accuracy only
 
-A1 and B use the same model/runtime settings. A1 uses the activity-aligned pkl;
-B uses `data/radar_v4/rerun/yolo26xpose/pyskl/continuous_window_w60_s12`.
+A1, B, and C use the same model/runtime settings. A1 uses the
+activity-aligned pkl. B uses
+`data/radar_v4/rerun/yolo26xpose/pyskl/continuous_window_w60_s12`. C uses
+`data/radar_v4/rerun/yolo26xpose/pyskl/continuous_window_w60_s12_triangular`.
 
 The training pipeline is:
 
@@ -66,6 +72,17 @@ Flip -> PreNormalize2D(mode='auto') -> GenSkeFeat -> MonotonicUniformResample(60
 
 Validation and test omit `Flip` and use the same deterministic monotonic
 resampling.
+
+For C training only, the pipeline inserts:
+
+```python
+dict(type='UseSoftLabel', source_key='label_soft_triangular', num_classes=9)
+```
+
+This replaces the training batch `label` with the triangular soft target before
+the loss. The underlying dataset item still keeps the hard center `label`, so
+the square-root sampler is unchanged. C validation and test do not use this
+transform and therefore evaluate against hard center labels, like B.
 
 ## Square-Root Sampler
 
@@ -82,6 +99,7 @@ training work directory:
 ```text
 work_dirs/rerun/e1/fold_<fold>/<stream>/a1_activity_aligned/sampler_indices
 work_dirs/rerun/e1/fold_<fold>/<stream>/b_continuous_window/sampler_indices
+work_dirs/rerun/e1/fold_<fold>/<stream>/c_triangular_temporal_composition/sampler_indices
 ```
 
 With 4-GPU distributed training, PYSKL pads the rank slices when `N_train` is not
@@ -98,7 +116,7 @@ summary with:
 python rerun/e1/summarize_results.py
 ```
 
-The script reads `best_pred.pkl` and `best_eval.json` from
+The script reads available `best_pred.pkl` and `best_eval.json` files from
 `work_dirs/rerun/e1`, verifies the saved single-stream metrics, fuses joint and
 bone as `0.5 * (joint_probability + bone_probability)`, and writes:
 
@@ -119,8 +137,8 @@ Fusion predictions and metrics are written under
 
 ## Continuous Segmental Metrics
 
-The main summary script also evaluates continuous-window conditions A2 and B
-with MS-TCN-style segmental metrics:
+The main summary script also evaluates available continuous-window conditions
+A2, B, and C with MS-TCN-style segmental metrics:
 
 - normalized Edit score
 - segmental F1@10

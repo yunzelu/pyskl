@@ -53,7 +53,8 @@ fusion is applied directly to those probabilities.
 ## Continuous Segmental Metrics
 
 Segmental metrics are computed only for continuous-window evaluation
-conditions A2 and B. Each recording is evaluated independently;
+conditions A2, B, and C when available. Each recording is
+evaluated independently;
 segmental F1 pools TP, FP, and FN counts across recordings within
 a fold, while Edit is normalized per recording and then averaged.
 

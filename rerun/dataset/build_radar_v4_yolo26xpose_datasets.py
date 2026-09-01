@@ -9,7 +9,9 @@ This script implements the thesis rerun dataset protocol:
 3. Build continuous-window samples from detected skeleton rows using a
    60-frame window, 12-frame stride, center-row labels, and timestamp validity
    checks.
-4. Save PYSKL-compatible pickle files plus sidecar statistics for the fixed
+4. Build an optional triangular temporal-composition variant of the continuous
+   windows for soft-label training.
+5. Save PYSKL-compatible pickle files plus sidecar statistics for the fixed
    subject-wise folds.
 """
 
@@ -151,6 +153,20 @@ def normalize_label(label: Any) -> str | None:
     if not key:
         return None
     return LABEL_ALIASES.get(key)
+
+
+def bartlett_triangular_weights(length: int) -> np.ndarray:
+    if length <= 0:
+        raise ValueError("Triangular target length must be positive.")
+    if length == 1:
+        return np.ones(1, dtype=np.float64)
+
+    positions = np.arange(length, dtype=np.float64)
+    raw = 1.0 - np.abs(2.0 * positions - float(length - 1)) / float(length - 1)
+    total = float(raw.sum())
+    if total <= 0:
+        raise ValueError("Triangular target weights have zero total mass.")
+    return raw / total
 
 
 def parse_session_dir_name(name: str) -> SessionId:
@@ -547,6 +563,79 @@ def make_annotation(
     return annotation
 
 
+def segment_labels_for_detected_rows(session: SessionData) -> list[Any]:
+    """Map each retained skeleton row to the metadata segment covering it."""
+
+    row_labels: list[Any] = [None] * int(session.frame_indices.size)
+    overlaps: list[int] = []
+
+    for segment in session.segments:
+        if "start_frame" not in segment or "end_frame" not in segment:
+            continue
+
+        segment_start = int(segment["start_frame"])
+        segment_end = int(segment["end_frame"])
+        if segment_start > segment_end:
+            raise RuntimeError(
+                f"Invalid segment range in {session.jsonl_path}: {segment}"
+            )
+
+        left = int(np.searchsorted(session.frame_indices, segment_start, side="left"))
+        right = int(np.searchsorted(session.frame_indices, segment_end, side="right"))
+        for row_index in range(left, right):
+            if row_labels[row_index] is not None:
+                overlaps.append(int(session.frame_indices[row_index]))
+            row_labels[row_index] = segment.get("label")
+
+    if overlaps:
+        preview = ", ".join(str(item) for item in overlaps[:10])
+        raise RuntimeError(
+            f"Overlapping annotation segments in {session.jsonl_path}; "
+            f"example frame_idx values: {preview}"
+        )
+
+    return row_labels
+
+
+def triangular_soft_target(
+    raw_frame_labels: list[Any],
+    normalized_weights: np.ndarray,
+) -> tuple[list[float], float, int, Counter]:
+    if len(raw_frame_labels) != len(normalized_weights):
+        raise ValueError(
+            "Frame-label count must match triangular target weight count."
+        )
+
+    class_mass = np.zeros(len(FINAL_LABELS), dtype=np.float64)
+    valid_weight_mass = 0.0
+    valid_frame_count = 0
+    invalid_frame_labels: Counter = Counter()
+
+    for raw_label, weight in zip(raw_frame_labels, normalized_weights):
+        label_name = normalize_label(raw_label)
+        if label_name is None:
+            invalid_frame_labels[str(raw_label)] += 1
+            continue
+
+        valid_frame_count += 1
+        valid_weight_mass += float(weight)
+        class_mass[LABEL_TO_ID[label_name]] += float(weight)
+
+    if valid_weight_mass <= 0:
+        raise RuntimeError(
+            "Triangular target has zero valid label mass. This should not "
+            "happen when the center frame has a valid final label."
+        )
+
+    class_mass /= valid_weight_mass
+    return (
+        [float(value) for value in class_mass.astype(np.float32)],
+        float(valid_weight_mass),
+        valid_frame_count,
+        invalid_frame_labels,
+    )
+
+
 def is_open_ended_tail_segment(session: SessionData, segment_index: int) -> bool:
     return (
         session.identity.directory_name.lower() in OPEN_ENDED_TAIL_RECORDINGS
@@ -665,11 +754,21 @@ def build_continuous_window(
     stride: int,
     max_adjacent_gap_sec: float,
     max_window_span_sec: float,
+    triangular_soft_labels: bool = False,
 ) -> ProtocolResult:
-    protocol_id = f"continuous_window_w{window_size}_s{stride}"
+    base_protocol_id = f"continuous_window_w{window_size}_s{stride}"
+    protocol_id = (
+        f"{base_protocol_id}_triangular"
+        if triangular_soft_labels
+        else base_protocol_id
+    )
+    triangular_weights = (
+        bartlett_triangular_weights(window_size) if triangular_soft_labels else None
+    )
     annotations: list[dict[str, Any]] = []
     stats: dict[str, Any] = {
         "protocol_id": protocol_id,
+        "base_protocol_id": base_protocol_id,
         "source_recordings": len(sessions),
         "window_size": window_size,
         "stride": stride,
@@ -681,9 +780,36 @@ def build_continuous_window(
         "dropped_windows_by_reason": Counter(),
         "dropped_windows_by_label": Counter(),
         "tail_rows_dropped_by_session": {},
+        "triangular_soft_labels": triangular_soft_labels,
     }
+    if triangular_soft_labels:
+        assert triangular_weights is not None
+        stats["triangular_target"] = {
+            "field": "label_soft_triangular",
+            "num_classes": len(FINAL_LABELS),
+            "label_source": "annotation_info.segments matched by original frame_idx",
+            "weight_formula": "w_t proportional to 1 - abs(2*t - (L - 1)) / (L - 1)",
+            "renormalization_rule": (
+                "Frames whose labels are outside the final nine classes are "
+                "ignored and the remaining triangular mass is renormalized."
+            ),
+            "normalized_weights": [float(value) for value in triangular_weights],
+        }
+        stats["triangular_windows_with_invalid_frame_labels"] = 0
+        stats["triangular_windows_with_renormalization"] = 0
+        stats["triangular_invalid_frame_labels"] = Counter()
+        stats["triangular_invalid_windows_by_label"] = Counter()
+        stats["triangular_valid_weight_mass_min"] = 1.0
+        stats["triangular_valid_weight_mass_max"] = 0.0
+        stats["triangular_valid_frame_count_min"] = window_size
+        stats["triangular_valid_frame_count_max"] = 0
 
     for session in sessions:
+        segment_row_labels = (
+            segment_labels_for_detected_rows(session)
+            if triangular_soft_labels
+            else None
+        )
         row_count = int(session.frame_indices.size)
         if row_count < window_size:
             stats["tail_rows_dropped_by_session"][session.identity.directory_name] = row_count
@@ -724,6 +850,69 @@ def build_continuous_window(
                 continue
 
             row_slice = slice(row_start, row_end)
+            extra_fields = {
+                "window_row_start": row_start,
+                "window_row_end_exclusive": row_end,
+                "window_size": window_size,
+                "stride": stride,
+                "center_row_offset": window_size // 2,
+                "center_source_frame": int(session.frame_indices[center_row]),
+                "center_timestamp_sec": float(session.timestamps_sec[center_row]),
+                "center_raw_label": raw_label,
+                "max_adjacent_gap_sec": gmax,
+                "window_span_sec": window_span,
+            }
+            if triangular_soft_labels:
+                assert triangular_weights is not None
+                assert segment_row_labels is not None
+                (
+                    label_soft_triangular,
+                    valid_weight_mass,
+                    valid_frame_count,
+                    invalid_frame_labels,
+                ) = triangular_soft_target(
+                    raw_frame_labels=segment_row_labels[row_start:row_end],
+                    normalized_weights=triangular_weights,
+                )
+                invalid_frame_count = int(window_size - valid_frame_count)
+                if invalid_frame_count > 0:
+                    stats["triangular_windows_with_invalid_frame_labels"] += 1
+                    stats["triangular_invalid_frame_labels"].update(
+                        invalid_frame_labels
+                    )
+                    for invalid_label in invalid_frame_labels:
+                        stats["triangular_invalid_windows_by_label"][invalid_label] += 1
+                if valid_weight_mass < 1.0 - 1e-6:
+                    stats["triangular_windows_with_renormalization"] += 1
+
+                stats["triangular_valid_weight_mass_min"] = min(
+                    float(stats["triangular_valid_weight_mass_min"]),
+                    valid_weight_mass,
+                )
+                stats["triangular_valid_weight_mass_max"] = max(
+                    float(stats["triangular_valid_weight_mass_max"]),
+                    valid_weight_mass,
+                )
+                stats["triangular_valid_frame_count_min"] = min(
+                    int(stats["triangular_valid_frame_count_min"]),
+                    valid_frame_count,
+                )
+                stats["triangular_valid_frame_count_max"] = max(
+                    int(stats["triangular_valid_frame_count_max"]),
+                    valid_frame_count,
+                )
+                extra_fields.update(
+                    {
+                        "label_soft_triangular": label_soft_triangular,
+                        "triangular_valid_weight_mass": valid_weight_mass,
+                        "triangular_valid_frame_count": valid_frame_count,
+                        "triangular_invalid_frame_count": invalid_frame_count,
+                        "triangular_label_source": (
+                            "annotation_info.segments matched by original frame_idx"
+                        ),
+                    }
+                )
+
             annotation = make_annotation(
                 session=session,
                 protocol_id=protocol_id,
@@ -731,18 +920,7 @@ def build_continuous_window(
                 label_name=label_name,
                 raw_label=raw_label,
                 row_positions=row_slice,
-                extra_fields={
-                    "window_row_start": row_start,
-                    "window_row_end_exclusive": row_end,
-                    "window_size": window_size,
-                    "stride": stride,
-                    "center_row_offset": window_size // 2,
-                    "center_source_frame": int(session.frame_indices[center_row]),
-                    "center_timestamp_sec": float(session.timestamps_sec[center_row]),
-                    "center_raw_label": raw_label,
-                    "max_adjacent_gap_sec": gmax,
-                    "window_span_sec": window_span,
-                },
+                extra_fields=extra_fields,
             )
             annotations.append(annotation)
             session_window_index += 1
@@ -1128,8 +1306,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--protocol",
-        choices=["both", "activity_aligned", "continuous_window"],
-        default="both",
+        choices=[
+            "all",
+            "both",
+            "activity_aligned",
+            "continuous_window",
+            "continuous_window_triangular",
+        ],
+        default="all",
         help="Dataset protocol to build.",
     )
     parser.add_argument(
@@ -1208,7 +1392,7 @@ def main() -> None:
     subjects = sorted({session.identity.subject for session in sessions})
     print(f"[INFO] Loaded {len(sessions)} included sessions for subjects: {subjects}")
 
-    if args.protocol in {"both", "activity_aligned"}:
+    if args.protocol in {"all", "both", "activity_aligned"}:
         print("[INFO] Building activity-aligned dataset.")
         save_protocol(
             output_root,
@@ -1219,7 +1403,7 @@ def main() -> None:
             ),
         )
 
-    if args.protocol in {"both", "continuous_window"}:
+    if args.protocol in {"all", "both", "continuous_window"}:
         print("[INFO] Building continuous-window dataset.")
         save_protocol(
             output_root,
@@ -1229,6 +1413,20 @@ def main() -> None:
                 stride=args.stride,
                 max_adjacent_gap_sec=args.max_adjacent_gap_sec,
                 max_window_span_sec=args.max_window_span_sec,
+            ),
+        )
+
+    if args.protocol in {"all", "continuous_window_triangular"}:
+        print("[INFO] Building continuous-window triangular soft-label dataset.")
+        save_protocol(
+            output_root,
+            build_continuous_window(
+                sessions=sessions,
+                window_size=args.window_size,
+                stride=args.stride,
+                max_adjacent_gap_sec=args.max_adjacent_gap_sec,
+                max_window_span_sec=args.max_window_span_sec,
+                triangular_soft_labels=True,
             ),
         )
 

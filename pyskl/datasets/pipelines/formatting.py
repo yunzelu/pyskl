@@ -87,6 +87,50 @@ class Rename:
 
 
 @PIPELINES.register_module()
+class UseSoftLabel:
+    """Use a probability-distribution target as the training label."""
+
+    def __init__(self,
+                 source_key='label_soft',
+                 target_key='label',
+                 num_classes=None,
+                 atol=1e-4):
+        self.source_key = source_key
+        self.target_key = target_key
+        self.num_classes = None if num_classes is None else int(num_classes)
+        self.atol = float(atol)
+
+    def __call__(self, results):
+        if self.source_key not in results:
+            raise KeyError(f'Missing soft-label field: {self.source_key}')
+
+        label = np.asarray(results[self.source_key], dtype=np.float32)
+        if label.ndim != 1:
+            raise ValueError(
+                f'Soft label must be 1D, got shape {label.shape}')
+        if self.num_classes is not None and label.size != self.num_classes:
+            raise ValueError(
+                f'Soft label has {label.size} classes, expected '
+                f'{self.num_classes}')
+        if not np.isfinite(label).all():
+            raise ValueError('Soft label contains NaN or Inf')
+        if np.any(label < -self.atol):
+            raise ValueError('Soft label contains negative values')
+        if abs(float(label.sum()) - 1.0) > self.atol:
+            raise ValueError(
+                f'Soft label must sum to 1, got {float(label.sum())}')
+
+        results[self.target_key] = label
+        return results
+
+    def __repr__(self):
+        return (
+            f'{self.__class__.__name__}('
+            f'source_key={self.source_key}, target_key={self.target_key}, '
+            f'num_classes={self.num_classes})')
+
+
+@PIPELINES.register_module()
 class Collect:
     """Collect data from the loader relevant to the specific task.
 

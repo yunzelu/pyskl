@@ -43,11 +43,29 @@ THRESHOLDS = [0.10, 0.25, 0.50]
 class ContinuousCondition:
     key: str
     result_dir: str
+    pkl_protocol_dir: str
+    pkl_stem: str
 
 
 CONDITIONS = [
-    ContinuousCondition("a2", "a2_activity_checkpoint_on_continuous"),
-    ContinuousCondition("b", "b_continuous_window"),
+    ContinuousCondition(
+        "a2",
+        "a2_activity_checkpoint_on_continuous",
+        "continuous_window_w60_s12",
+        "radarv4_yolo26xpose_continuous_window_w60_s12_fold_{fold}.pkl",
+    ),
+    ContinuousCondition(
+        "b",
+        "b_continuous_window",
+        "continuous_window_w60_s12",
+        "radarv4_yolo26xpose_continuous_window_w60_s12_fold_{fold}.pkl",
+    ),
+    ContinuousCondition(
+        "c",
+        "c_triangular_temporal_composition",
+        "continuous_window_w60_s12_triangular",
+        "radarv4_yolo26xpose_continuous_window_w60_s12_triangular_fold_{fold}.pkl",
+    ),
 ]
 
 
@@ -104,12 +122,8 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer.writerows(rows)
 
 
-def continuous_pkl_path(data_root: Path, fold: str) -> Path:
-    return (
-        data_root
-        / "continuous_window_w60_s12"
-        / f"radarv4_yolo26xpose_continuous_window_w60_s12_fold_{fold}.pkl"
-    )
+def continuous_pkl_path(data_root: Path, condition: ContinuousCondition, fold: str) -> Path:
+    return data_root / condition.pkl_protocol_dir / condition.pkl_stem.format(fold=fold)
 
 
 def split_annotations(pkl_file: Path, split_name: str = "test") -> list[dict[str, Any]]:
@@ -330,6 +344,29 @@ def result_path(work_root: Path, fold: str, stream: str, condition: ContinuousCo
     return work_root / f"fold_{fold}" / stream / condition.result_dir / "best_pred.pkl"
 
 
+def active_conditions(work_root: Path) -> list[ContinuousCondition]:
+    active: list[ContinuousCondition] = []
+    expected_count = len(FOLDS) * len(STREAMS)
+    for condition in CONDITIONS:
+        paths = [
+            result_path(work_root, fold, stream, condition)
+            for fold in FOLDS
+            for stream in STREAMS
+        ]
+        existing_count = sum(path.exists() for path in paths)
+        if existing_count == 0:
+            continue
+        if existing_count != expected_count:
+            missing = [str(path) for path in paths if not path.exists()]
+            raise FileNotFoundError(
+                f"Partial results for condition {condition.key}: "
+                f"{existing_count}/{expected_count} best_pred.pkl files found. "
+                f"Missing examples: {missing[:3]}"
+            )
+        active.append(condition)
+    return active
+
+
 def evaluate_fold_stream(
     work_root: Path,
     data_root: Path,
@@ -340,7 +377,7 @@ def evaluate_fold_stream(
     background: set[int],
     axis: str,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    annotations = split_annotations(continuous_pkl_path(data_root, fold), "test")
+    annotations = split_annotations(continuous_pkl_path(data_root, condition, fold), "test")
     groups = grouped_sequences(annotations, probabilities)
 
     record_rows: list[dict[str, Any]] = []
@@ -396,7 +433,12 @@ def aggregate_mean_sd(fold_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         grouped[(str(row["condition"]), str(row["stream"]))].append(row)
 
     summary_rows: list[dict[str, Any]] = []
-    for condition in [item.key for item in CONDITIONS]:
+    present_conditions = [
+        condition.key
+        for condition in CONDITIONS
+        if any(str(row["condition"]) == condition.key for row in fold_rows)
+    ]
+    for condition in present_conditions:
         for stream in [*STREAMS, "fusion"]:
             rows = grouped[(condition, stream)]
             if len(rows) != len(FOLDS):
@@ -484,7 +526,7 @@ def evaluate_continuous_segmental(
     recording_rows: list[dict[str, Any]] = []
     score_format_rows: list[dict[str, Any]] = []
 
-    for condition in CONDITIONS:
+    for condition in active_conditions(work_root):
         for fold in FOLDS:
             stream_probs: dict[str, np.ndarray] = {}
             for stream in STREAMS:
