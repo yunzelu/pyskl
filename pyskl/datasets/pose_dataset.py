@@ -5,6 +5,7 @@ import os.path as osp
 from ..utils import get_root_logger
 from .base import BaseDataset
 from .builder import DATASETS
+from .pickle_compat import install_numpy_pickle_compat_aliases
 
 
 @DATASETS.register_module()
@@ -113,6 +114,7 @@ class PoseDataset(BaseDataset):
         return self.load_pkl_annotations()
 
     def load_pkl_annotations(self):
+        install_numpy_pickle_compat_aliases()
         data = mmcv.load(self.ann_file)
 
         if self.split:
