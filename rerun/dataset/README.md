@@ -2,7 +2,7 @@
 
 This folder contains the new dataset-building code for the thesis rerun. The
 builder is intentionally separate from the older `tools/data/radar_v4` scripts
-because the rerun protocol removes prior artifact rules.
+so the rerun protocol is explicit and uniform.
 
 ## Script
 
@@ -81,8 +81,15 @@ Activity-aligned samples:
 
 - Use only `annotation_info/segments` from the JSONL metadata line.
 - Each mapped manual segment becomes one sample.
-- No context expansion, interpolation, fixed-length clipping, or zero-fill
-  artifact rule is applied.
+- Exclude the trailing open-ended interval from recordings known not to end
+  with an `END` annotation: `12-xilai-sit2`, `19-saad-laysofa`, and
+  `7-han-sit`.
+- Require at least 2 detected skeleton rows inside the annotated segment.
+- Require maximum adjacent timestamp gap <= 0.5 seconds inside the detected
+  skeleton rows.
+- No total-duration/span constraint is applied.
+- No context expansion, interpolation, fixed-length clipping, or zero-fill rule
+  is applied.
 - Because preprocessing removes no-detection rows, sample length is the number
   of detected skeleton rows inside the annotated segment.
 

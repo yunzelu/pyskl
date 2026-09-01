@@ -37,20 +37,20 @@ model = dict(
 # Each sample i has weight a_i = 1 / sqrt(n_yi).
 # Sampling is with replacement; one epoch requests N_train samples.
 # DDP may add <= world_size - 1 padded samples internally for equal rank lengths.
-# N_train = 6373
+# N_train = 5939
 # Natural train counts and expected requested draws per epoch:
-# 0: lie-stationary: n=899, expected=816.5
-# 1: sit-stationary: n=471, expected=591.0
-# 2: walk: n=1406, expected=1021.1
-# 3: fall: n=462, expected=585.4
-# 4: transition-lie-to-sit: n=445, expected=574.5
-# 5: transition-lie-to-stand: n=452, expected=579.0
-# 6: transition-sit-to-lie: n=446, expected=575.1
-# 7: transition-sit-to-stand: n=894, expected=814.3
-# 8: transition-stand-to-sit: n=898, expected=816.1
+# 0: lie-stationary: n=892, expected=779.0
+# 1: sit-stationary: n=471, expected=566.1
+# 2: walk: n=979, expected=816.1
+# 3: fall: n=462, expected=560.6
+# 4: transition-lie-to-sit: n=445, expected=550.2
+# 5: transition-lie-to-stand: n=452, expected=554.5
+# 6: transition-sit-to-lie: n=446, expected=550.8
+# 7: transition-sit-to-stand: n=894, expected=779.9
+# 8: transition-stand-to-sit: n=898, expected=781.6
 class_sample_strategy = 'sqrt'
 class_sample_power = 0.5
-epoch_size = 6373
+epoch_size = 5939
 
 # COCO-17 left/right keypoint ids
 coco_left = [1, 3, 5, 7, 9, 11, 13, 15]

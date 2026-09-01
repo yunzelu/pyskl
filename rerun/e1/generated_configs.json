@@ -23,9 +23,9 @@
       "activity_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\activity_aligned\\radarv4_yolo26xpose_activity_aligned_fold_a.pkl",
       "continuous_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\continuous_window_w60_s12\\radarv4_yolo26xpose_continuous_window_w60_s12_fold_a.pkl",
       "train_counts": {
-        "lie-stationary": 951,
+        "lie-stationary": 941,
         "sit-stationary": 497,
-        "walk": 1480,
+        "walk": 1060,
         "fall": 475,
         "transition-lie-to-sit": 476,
         "transition-lie-to-stand": 471,
@@ -33,15 +33,15 @@
         "transition-sit-to-stand": 952,
         "transition-stand-to-sit": 953
       },
-      "epoch_size": 6731
+      "epoch_size": 6301
     },
     "b": {
       "activity_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\activity_aligned\\radarv4_yolo26xpose_activity_aligned_fold_b.pkl",
       "continuous_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\continuous_window_w60_s12\\radarv4_yolo26xpose_continuous_window_w60_s12_fold_b.pkl",
       "train_counts": {
-        "lie-stationary": 894,
+        "lie-stationary": 887,
         "sit-stationary": 468,
-        "walk": 1397,
+        "walk": 1030,
         "fall": 454,
         "transition-lie-to-sit": 447,
         "transition-lie-to-stand": 442,
@@ -49,15 +49,15 @@
         "transition-sit-to-stand": 894,
         "transition-stand-to-sit": 899
       },
-      "epoch_size": 6343
+      "epoch_size": 5969
     },
     "c": {
       "activity_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\activity_aligned\\radarv4_yolo26xpose_activity_aligned_fold_c.pkl",
       "continuous_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\continuous_window_w60_s12\\radarv4_yolo26xpose_continuous_window_w60_s12_fold_c.pkl",
       "train_counts": {
-        "lie-stationary": 899,
+        "lie-stationary": 892,
         "sit-stationary": 471,
-        "walk": 1406,
+        "walk": 979,
         "fall": 462,
         "transition-lie-to-sit": 445,
         "transition-lie-to-stand": 452,
@@ -65,7 +65,7 @@
         "transition-sit-to-stand": 894,
         "transition-stand-to-sit": 898
       },
-      "epoch_size": 6373
+      "epoch_size": 5939
     }
   }
 }

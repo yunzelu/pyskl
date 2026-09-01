@@ -4,8 +4,8 @@ This script implements the thesis rerun dataset protocol:
 
 1. Preprocess source JSONL files by removing frame rows with ``detected: false``.
 2. Build activity-aligned samples from ``annotation_info/segments`` in JSONL
-   metadata, without transition expansion, interpolation, or other artifact
-   rules.
+   metadata, with strict detected-frame and timestamp-gap validity checks, but
+   without transition expansion, interpolation, or fixed-duration constraints.
 3. Build continuous-window samples from detected skeleton rows using a
    60-frame window, 12-frame stride, center-row labels, and timestamp validity
    checks.
@@ -33,6 +33,8 @@ RAW_JSONL_ROOT = Path("data/radar_v4/raw_jsonl/yolo26xpose")
 OUTPUT_ROOT = Path("data/radar_v4/rerun/yolo26xpose")
 
 INCLUDED_SESSION_FAMILIES = {"fall", "sit", "laysofa"}
+OPEN_ENDED_TAIL_RECORDINGS = {"12-xilai-sit2", "19-saad-laysofa", "7-han-sit"}
+ACTIVITY_MIN_DETECTED_FRAMES = 2
 
 FINAL_LABELS = [
     "lie-stationary",
@@ -545,22 +547,48 @@ def make_annotation(
     return annotation
 
 
-def build_activity_aligned(sessions: list[SessionData]) -> ProtocolResult:
+def is_open_ended_tail_segment(session: SessionData, segment_index: int) -> bool:
+    return (
+        session.identity.directory_name.lower() in OPEN_ENDED_TAIL_RECORDINGS
+        and segment_index == len(session.segments) - 1
+    )
+
+
+def build_activity_aligned(
+    sessions: list[SessionData],
+    min_detected_frames: int,
+    max_adjacent_gap_sec: float,
+) -> ProtocolResult:
     protocol_id = "activity_aligned"
     annotations: list[dict[str, Any]] = []
     stats: dict[str, Any] = {
         "protocol_id": protocol_id,
         "source_recordings": len(sessions),
+        "min_detected_frames_per_segment": min_detected_frames,
+        "max_adjacent_gap_sec": max_adjacent_gap_sec,
+        "open_ended_tail_recordings": sorted(OPEN_ENDED_TAIL_RECORDINGS),
         "source_segments": 0,
+        "segments_checked_for_gap": 0,
         "samples_created": 0,
+        "max_observed_adjacent_gap_sec": 0.0,
         "dropped_segments_by_reason": Counter(),
         "dropped_segments_by_label": Counter(),
+        "dropped_open_ended_tail_by_session": Counter(),
     }
 
     for session in sessions:
         for segment_index, segment in enumerate(session.segments):
             stats["source_segments"] += 1
             raw_label = segment.get("label")
+
+            if is_open_ended_tail_segment(session, segment_index):
+                stats["dropped_segments_by_reason"]["open_ended_tail_interval"] += 1
+                stats["dropped_segments_by_label"][str(raw_label)] += 1
+                stats["dropped_open_ended_tail_by_session"][
+                    session.identity.directory_name
+                ] += 1
+                continue
+
             label_name = normalize_label(raw_label)
             if label_name is None:
                 stats["dropped_segments_by_reason"]["label_not_in_final_set"] += 1
@@ -587,6 +615,23 @@ def build_activity_aligned(sessions: list[SessionData]) -> ProtocolResult:
                 stats["dropped_segments_by_reason"]["no_valid_detection_in_segment"] += 1
                 stats["dropped_segments_by_label"][str(raw_label)] += 1
                 continue
+            if row_positions.size < min_detected_frames:
+                stats["dropped_segments_by_reason"]["below_min_detected_frames"] += 1
+                stats["dropped_segments_by_label"][str(raw_label)] += 1
+                continue
+
+            timestamps = session.timestamps_sec[row_positions]
+            adjacent_gaps = np.diff(timestamps)
+            gmax = float(np.max(adjacent_gaps))
+            stats["segments_checked_for_gap"] += 1
+            stats["max_observed_adjacent_gap_sec"] = max(
+                float(stats["max_observed_adjacent_gap_sec"]),
+                gmax,
+            )
+            if gmax > max_adjacent_gap_sec:
+                stats["dropped_segments_by_reason"]["max_adjacent_gap"] += 1
+                stats["dropped_segments_by_label"][str(raw_label)] += 1
+                continue
 
             annotation = make_annotation(
                 session=session,
@@ -603,6 +648,8 @@ def build_activity_aligned(sessions: list[SessionData]) -> ProtocolResult:
                         segment.get("length_frames", segment_end - segment_start + 1)
                     ),
                     "detected_frames_in_segment": int(row_positions.size),
+                    "max_adjacent_gap_sec": gmax,
+                    "segment_span_sec": float(timestamps[-1] - timestamps[0]),
                 },
             )
             annotations.append(annotation)
@@ -1101,7 +1148,16 @@ def parse_args() -> argparse.Namespace:
         "--max-adjacent-gap-sec",
         type=float,
         default=0.5,
-        help="Reject continuous windows with any adjacent timestamp gap above this value.",
+        help=(
+            "Reject activity-aligned segments and continuous windows with any "
+            "adjacent timestamp gap above this value."
+        ),
+    )
+    parser.add_argument(
+        "--activity-min-detected-frames",
+        type=int,
+        default=ACTIVITY_MIN_DETECTED_FRAMES,
+        help="Reject activity-aligned segments with fewer detected skeleton rows.",
     )
     parser.add_argument(
         "--max-window-span-sec",
@@ -1120,6 +1176,10 @@ def main() -> None:
         raise ValueError("--stride must be positive.")
     if args.window_size % 2 != 0:
         raise ValueError("--window-size must be even so center offset is start + window_size / 2.")
+    if args.max_adjacent_gap_sec <= 0:
+        raise ValueError("--max-adjacent-gap-sec must be positive.")
+    if args.activity_min_detected_frames < 2:
+        raise ValueError("--activity-min-detected-frames must be at least 2.")
 
     output_root = args.output_root
     detected_jsonl_root = args.detected_jsonl_root or (output_root / "detected_jsonl")
@@ -1150,7 +1210,14 @@ def main() -> None:
 
     if args.protocol in {"both", "activity_aligned"}:
         print("[INFO] Building activity-aligned dataset.")
-        save_protocol(output_root, build_activity_aligned(sessions))
+        save_protocol(
+            output_root,
+            build_activity_aligned(
+                sessions=sessions,
+                min_detected_frames=args.activity_min_detected_frames,
+                max_adjacent_gap_sec=args.max_adjacent_gap_sec,
+            ),
+        )
 
     if args.protocol in {"both", "continuous_window"}:
         print("[INFO] Building continuous-window dataset.")
