@@ -25,9 +25,9 @@ WORK_ROOT="work_dirs/rerun/e1/fold_${FOLD}"
 
 for stream in ${STREAMS}; do
   a1_config="${CONFIG_ROOT}/${stream}/a1_activity_aligned.py"
-  a2_config="${CONFIG_ROOT}/${stream}/a2_continuous_window.py"
+  b_config="${CONFIG_ROOT}/${stream}/b_continuous_window.py"
   a1_work_dir="${WORK_ROOT}/${stream}/a1_activity_aligned"
-  a2_work_dir="${WORK_ROOT}/${stream}/a2_continuous_window"
+  a2_eval_dir="${WORK_ROOT}/${stream}/a2_activity_checkpoint_on_continuous"
 
   bash tools/dist_train.sh "${a1_config}" "${GPUS}" --validate --test-best --seed "${SEED}" --deterministic
 
@@ -39,8 +39,10 @@ for stream in ${STREAMS}; do
   fi
   best_ckpt="${best_ckpts[0]}"
 
-  mkdir -p "${a2_work_dir}"
-  bash tools/dist_test.sh "${a2_config}" "${best_ckpt}" "${GPUS}" \
-    --out "${a2_work_dir}/best_pred.pkl" \
-    --eval-out "${a2_work_dir}/best_eval.json"
+  mkdir -p "${a2_eval_dir}"
+  bash tools/dist_test.sh "${b_config}" "${best_ckpt}" "${GPUS}" \
+    --out "${a2_eval_dir}/best_pred.pkl" \
+    --eval-out "${a2_eval_dir}/best_eval.json"
+
+  bash tools/dist_train.sh "${b_config}" "${GPUS}" --validate --test-best --seed "${SEED}" --deterministic
 done

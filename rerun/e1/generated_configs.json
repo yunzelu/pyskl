@@ -1,28 +1,36 @@
 {
   "configs": [
     "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_a\\joint\\a1_activity_aligned.py",
-    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_a\\joint\\a2_continuous_window.py",
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_a\\joint\\b_continuous_window.py",
     "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_a\\bone\\a1_activity_aligned.py",
-    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_a\\bone\\a2_continuous_window.py",
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_a\\bone\\b_continuous_window.py",
     "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_b\\joint\\a1_activity_aligned.py",
-    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_b\\joint\\a2_continuous_window.py",
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_b\\joint\\b_continuous_window.py",
     "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_b\\bone\\a1_activity_aligned.py",
-    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_b\\bone\\a2_continuous_window.py",
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_b\\bone\\b_continuous_window.py",
     "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_c\\joint\\a1_activity_aligned.py",
-    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_c\\joint\\a2_continuous_window.py",
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_c\\joint\\b_continuous_window.py",
     "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_c\\bone\\a1_activity_aligned.py",
-    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_c\\bone\\a2_continuous_window.py"
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_c\\bone\\b_continuous_window.py"
   ],
   "jobs": [
     "rerun\\e1\\slurm\\run_fold_a.sh",
     "rerun\\e1\\slurm\\run_fold_b.sh",
     "rerun\\e1\\slurm\\run_fold_c.sh"
   ],
+  "deleted_legacy_configs": [
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_a\\joint\\a2_continuous_window.py",
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_a\\bone\\a2_continuous_window.py",
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_b\\joint\\a2_continuous_window.py",
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_b\\bone\\a2_continuous_window.py",
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_c\\joint\\a2_continuous_window.py",
+    "configs\\stgcn++\\stgcn++_radarv4\\rerun\\e1\\fold_c\\bone\\a2_continuous_window.py"
+  ],
   "folds": {
     "a": {
       "activity_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\activity_aligned\\radarv4_yolo26xpose_activity_aligned_fold_a.pkl",
       "continuous_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\continuous_window_w60_s12\\radarv4_yolo26xpose_continuous_window_w60_s12_fold_a.pkl",
-      "train_counts": {
+      "activity_train_counts": {
         "lie-stationary": 941,
         "sit-stationary": 497,
         "walk": 1060,
@@ -33,12 +41,24 @@
         "transition-sit-to-stand": 952,
         "transition-stand-to-sit": 953
       },
-      "epoch_size": 6301
+      "activity_epoch_size": 6301,
+      "continuous_train_counts": {
+        "lie-stationary": 8705,
+        "sit-stationary": 4199,
+        "walk": 18332,
+        "fall": 1452,
+        "transition-lie-to-sit": 1888,
+        "transition-lie-to-stand": 3904,
+        "transition-sit-to-lie": 1602,
+        "transition-sit-to-stand": 1402,
+        "transition-stand-to-sit": 1809
+      },
+      "continuous_epoch_size": 43293
     },
     "b": {
       "activity_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\activity_aligned\\radarv4_yolo26xpose_activity_aligned_fold_b.pkl",
       "continuous_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\continuous_window_w60_s12\\radarv4_yolo26xpose_continuous_window_w60_s12_fold_b.pkl",
-      "train_counts": {
+      "activity_train_counts": {
         "lie-stationary": 887,
         "sit-stationary": 468,
         "walk": 1030,
@@ -49,12 +69,24 @@
         "transition-sit-to-stand": 894,
         "transition-stand-to-sit": 899
       },
-      "epoch_size": 5969
+      "activity_epoch_size": 5969,
+      "continuous_train_counts": {
+        "lie-stationary": 8086,
+        "sit-stationary": 4476,
+        "walk": 19306,
+        "fall": 1393,
+        "transition-lie-to-sit": 1789,
+        "transition-lie-to-stand": 3538,
+        "transition-sit-to-lie": 1656,
+        "transition-sit-to-stand": 1496,
+        "transition-stand-to-sit": 2002
+      },
+      "continuous_epoch_size": 43742
     },
     "c": {
       "activity_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\activity_aligned\\radarv4_yolo26xpose_activity_aligned_fold_c.pkl",
       "continuous_pkl": "data\\radar_v4\\rerun\\yolo26xpose\\pyskl\\continuous_window_w60_s12\\radarv4_yolo26xpose_continuous_window_w60_s12_fold_c.pkl",
-      "train_counts": {
+      "activity_train_counts": {
         "lie-stationary": 892,
         "sit-stationary": 471,
         "walk": 979,
@@ -65,7 +97,19 @@
         "transition-sit-to-stand": 894,
         "transition-stand-to-sit": 898
       },
-      "epoch_size": 5939
+      "activity_epoch_size": 5939,
+      "continuous_train_counts": {
+        "lie-stationary": 8015,
+        "sit-stationary": 4473,
+        "walk": 18686,
+        "fall": 1414,
+        "transition-lie-to-sit": 1766,
+        "transition-lie-to-stand": 3920,
+        "transition-sit-to-lie": 1581,
+        "transition-sit-to-stand": 1528,
+        "transition-stand-to-sit": 1952
+      },
+      "continuous_epoch_size": 43335
     }
   }
 }

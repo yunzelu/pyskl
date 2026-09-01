@@ -1,17 +1,19 @@
 # E1 Skeleton Training-Inference Alignment
 
-This rerun experiment compares activity-aligned skeleton training with
-activity-aligned versus continuous-window evaluation.
+This rerun experiment compares activity-aligned skeleton training with direct
+continuous-window skeleton training under matched continuous-window inference.
 
 Implemented conditions:
 
 - A1: train on activity-aligned samples, validate on activity-aligned samples,
   evaluate on activity-aligned test samples.
 - A2: use the A1 activity-aligned checkpoint and evaluate on continuous-window
-  test samples.
+  test samples using the B continuous-window config.
+- B: train on continuous-window samples, validate on continuous-window samples,
+  evaluate on continuous-window test samples.
 
-Condition B is intentionally not generated in this step. It requires a
-continuous-window fine-tuning stage initialized from the selected A checkpoint.
+A2 does not have a separate config file. Its test dataset, preprocessing, and
+metrics are the same as B; the only difference is the checkpoint being loaded.
 
 ## Generate Configs
 
@@ -47,6 +49,10 @@ Each A1 config uses:
 - `GPUS=4` in the generated job scripts
 - `total_epochs=20`
 - validation checkpoint selection by `macro_f1`
+- metrics `macro_f1` and top-1 accuracy only
+
+A1 and B use the same model/runtime settings. A1 uses the activity-aligned pkl;
+B uses `data/radar_v4/rerun/yolo26xpose/pyskl/continuous_window_w60_s12`.
 
 The training pipeline is:
 
@@ -66,10 +72,11 @@ replacement. Validation and test datasets do not use the sampler.
 
 For reproducibility, run the jobs with the same seed for joint and bone streams.
 The generated jobs default to `SEED=42`. Per-epoch sampled index sequences are
-written under each A1 work directory:
+written under each training work directory:
 
 ```text
 work_dirs/rerun/e1/fold_<fold>/<stream>/a1_activity_aligned/sampler_indices
+work_dirs/rerun/e1/fold_<fold>/<stream>/b_continuous_window/sampler_indices
 ```
 
 With 4-GPU distributed training, PYSKL pads the rank slices when `N_train` is not

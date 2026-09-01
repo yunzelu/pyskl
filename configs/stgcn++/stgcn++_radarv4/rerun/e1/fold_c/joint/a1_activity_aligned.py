@@ -107,13 +107,13 @@ checkpoint_config = dict(interval=1)
 evaluation = dict(
     interval=1,
     metrics=['top_k_accuracy', 'macro_f1'],
-    metric_options=dict(top_k_accuracy=dict(topk=(1, 5))),
+    metric_options=dict(top_k_accuracy=dict(topk=(1,))),
     save_best='macro_f1',
     rule='greater'
 )
 test_evaluation = dict(
     metrics=['top_k_accuracy', 'macro_f1'],
-    metric_options=dict(top_k_accuracy=dict(topk=(1, 5)))
+    metric_options=dict(top_k_accuracy=dict(topk=(1,)))
 )
 log_config = dict(interval=100, hooks=[dict(type='TextLoggerHook')])
 log_level = 'INFO'
