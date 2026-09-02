@@ -110,7 +110,7 @@ split across ranks.
 ## Result Summary
 
 After the three folds finish for both streams, generate the joint/bone/fusion
-summary with:
+test-subject summary with:
 
 ```powershell
 python rerun/e1/summarize_results.py
@@ -134,6 +134,69 @@ rerun/e1/reports/e1_continuous_segmental_summary.md
 
 Fusion predictions and metrics are written under
 `work_dirs/rerun/e1/fold_<fold>/fusion/<condition>/`.
+
+## Validation-Subject Reporting
+
+For method-selection reporting, evaluate each selected checkpoint on the
+corresponding fold validation subject, then calculate joint, bone, and fusion
+metrics.
+
+Generate validation inference configs and jobs with:
+
+```powershell
+python rerun/e1/generate_validation_eval_scripts.py --overwrite
+```
+
+Generated validation configs:
+
+```text
+configs/stgcn++/stgcn++_radarv4/rerun/e1/fold_<fold>/<stream>/validation/<condition>_validation.py
+```
+
+Generated validation jobs:
+
+```text
+rerun/e1/slurm/run_validation_fold_<fold>_<stream>.sh
+```
+
+There are 6 validation jobs total, one per fold and stream. Each job evaluates
+A1, A2, B, and C for that fold/stream. The checkpoint rule is:
+
+- A1: use the stream checkpoint saved as `best_macro_f1_epoch_*.pth` under
+  `a1_activity_aligned`.
+- A2: use the same A1 checkpoint, but evaluate on the continuous-window
+  validation split.
+- B: use the stream checkpoint saved as `best_macro_f1_epoch_*.pth` under
+  `b_continuous_window`.
+- C: use the stream checkpoint saved as `best_macro_f1_epoch_*.pth` under
+  `c_triangular_temporal_composition`.
+
+Submit all validation inference jobs from the repository root with:
+
+```bash
+bash rerun/e1/slurm/submit_validation_jobs.sh
+```
+
+After all validation jobs finish, summarize validation metrics with:
+
+```powershell
+python rerun/e1/summarize_validation_results.py
+```
+
+The validation summarizer writes:
+
+```text
+rerun/e1/reports/e1_validation_fold_metrics.csv
+rerun/e1/reports/e1_validation_mean_sd.csv
+rerun/e1/reports/e1_validation_summary.json
+rerun/e1/reports/e1_validation_summary.md
+```
+
+Validation fusion predictions and metrics are written under:
+
+```text
+work_dirs/rerun/e1/fold_<fold>/fusion/<condition>/validation/
+```
 
 ## Continuous Segmental Metrics
 
