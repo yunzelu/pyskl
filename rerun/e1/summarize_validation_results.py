@@ -20,6 +20,11 @@ from typing import Any
 
 import numpy as np
 
+from evaluate_continuous_segmental import (
+    evaluate_continuous_segmental,
+    parse_background_labels,
+)
+
 
 LABELS = [
     "lie-stationary",
@@ -379,7 +384,15 @@ def format_mean_sd(mean: float, sd: float) -> str:
     return f"{mean:.4f} +- {sd:.4f}"
 
 
-def markdown_report(rows: list[dict[str, Any]], summary_rows: list[dict[str, Any]]) -> str:
+def format_segmental_mean_sd(mean: float, sd: float) -> str:
+    return f"{mean:.2f} +- {sd:.2f}"
+
+
+def markdown_report(
+    rows: list[dict[str, Any]],
+    summary_rows: list[dict[str, Any]],
+    segmental: dict[str, Any] | None,
+) -> str:
     lines = [
         "# E1 Validation-Subject Summary",
         "",
@@ -423,6 +436,57 @@ def markdown_report(rows: list[dict[str, Any]], summary_rows: list[dict[str, Any
                 f1=float(row["macro_f1"]),
             )
         )
+
+    if segmental is not None:
+        lines.extend(
+            [
+                "",
+                "## Continuous Segmental Metrics",
+                "",
+                "These validation metrics are computed only for continuous-window",
+                "conditions A2, B, and C. Each validation recording is evaluated",
+                "independently; segmental F1 pools TP, FP, and FN counts across",
+                "recordings within each fold, while Edit is normalized per",
+                "recording and then averaged.",
+                "",
+                "| Condition | Stream | Edit | F1@10 | F1@25 | F1@50 |",
+                "| --- | --- | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for row in segmental["mean_sd"]:
+            lines.append(
+                "| {condition} | {stream} | {edit} | {f10} | {f25} | {f50} |".format(
+                    condition=str(row["condition"]).upper(),
+                    stream=row["stream"],
+                    edit=format_segmental_mean_sd(row["edit_mean"], row["edit_sd"]),
+                    f10=format_segmental_mean_sd(row["f1_10_mean"], row["f1_10_sd"]),
+                    f25=format_segmental_mean_sd(row["f1_25_mean"], row["f1_25_sd"]),
+                    f50=format_segmental_mean_sd(row["f1_50_mean"], row["f1_50_sd"]),
+                )
+            )
+
+        lines.extend(
+            [
+                "",
+                "| Condition | Fold | Stream | Recordings | Windows | Edit | F1@10 | F1@25 | F1@50 |",
+                "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for row in segmental["fold_metrics"]:
+            lines.append(
+                "| {condition} | {fold} | {stream} | {recordings} | {windows} | "
+                "{edit:.2f} | {f10:.2f} | {f25:.2f} | {f50:.2f} |".format(
+                    condition=str(row["condition"]).upper(),
+                    fold=str(row["fold"]).upper(),
+                    stream=row["stream"],
+                    recordings=int(row["num_recordings"]),
+                    windows=int(row["num_windows"]),
+                    edit=float(row["edit"]),
+                    f10=float(row["f1_10"]),
+                    f25=float(row["f1_25"]),
+                    f50=float(row["f1_50"]),
+                )
+            )
     return "\n".join(lines) + "\n"
 
 
@@ -455,6 +519,19 @@ def summarize(args: argparse.Namespace) -> None:
             )
 
     summary_rows = aggregate_rows(rows)
+    segmental = None
+    if not args.skip_continuous_segmental:
+        segmental = evaluate_continuous_segmental(
+            work_root=args.work_root,
+            data_root=args.data_root,
+            output_dir=args.output_dir,
+            background=parse_background_labels(args.segmental_background_labels),
+            axis=args.segmental_overlap_axis,
+            split_name="val",
+            result_subdir="validation",
+            output_prefix="e1_validation_continuous_segmental",
+        )
+
     write_csv(args.output_dir / "e1_validation_fold_metrics.csv", rows)
     write_csv(args.output_dir / "e1_validation_mean_sd.csv", summary_rows)
     write_json(
@@ -464,10 +541,11 @@ def summarize(args: argparse.Namespace) -> None:
             "fold_weighting": "equal_weight_per_fold",
             "fold_metrics": rows,
             "mean_sd": summary_rows,
+            "continuous_segmental_metrics": segmental,
         },
     )
     (args.output_dir / "e1_validation_summary.md").write_text(
-        markdown_report(rows, summary_rows),
+        markdown_report(rows, summary_rows, segmental),
         encoding="utf-8",
         newline="\n",
     )
@@ -486,6 +564,23 @@ def parse_args() -> argparse.Namespace:
         "--no-write-fusion-predictions",
         action="store_true",
         help="Do not write fusion best_pred.pkl/best_eval.json under work_root.",
+    )
+    parser.add_argument(
+        "--skip-continuous-segmental",
+        action="store_true",
+        help="Skip validation continuous-window segmental Edit/F1 metrics.",
+    )
+    parser.add_argument(
+        "--segmental-background-labels",
+        nargs="*",
+        default=[],
+        help="Optional background labels by id or label name for segmental metrics.",
+    )
+    parser.add_argument(
+        "--segmental-overlap-axis",
+        choices=["center_source_frame", "sequence_index"],
+        default="sequence_index",
+        help="Axis used for validation continuous segment IoU intervals.",
     )
     return parser.parse_args()
 

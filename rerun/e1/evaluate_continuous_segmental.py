@@ -1,7 +1,7 @@
 """Evaluate continuous-window E1 outputs with segmental metrics.
 
 The evaluation treats each recording as an independent temporal sequence.
-Predictions are aligned to annotations by the PYSKL test dataset order:
+Predictions are aligned to annotations by the PYSKL dataset split order:
 ``PoseDataset`` filters the pkl annotation list by split while preserving the
 annotation order, and ``best_pred.pkl`` is written in that same order.
 """
@@ -340,16 +340,28 @@ def evaluate_recording(
     return payload
 
 
-def result_path(work_root: Path, fold: str, stream: str, condition: ContinuousCondition) -> Path:
-    return work_root / f"fold_{fold}" / stream / condition.result_dir / "best_pred.pkl"
+def result_path(
+    work_root: Path,
+    fold: str,
+    stream: str,
+    condition: ContinuousCondition,
+    result_subdir: str | None = None,
+) -> Path:
+    base = work_root / f"fold_{fold}" / stream / condition.result_dir
+    if result_subdir:
+        base = base / result_subdir
+    return base / "best_pred.pkl"
 
 
-def active_conditions(work_root: Path) -> list[ContinuousCondition]:
+def active_conditions(
+    work_root: Path,
+    result_subdir: str | None = None,
+) -> list[ContinuousCondition]:
     active: list[ContinuousCondition] = []
     expected_count = len(FOLDS) * len(STREAMS)
     for condition in CONDITIONS:
         paths = [
-            result_path(work_root, fold, stream, condition)
+            result_path(work_root, fold, stream, condition, result_subdir)
             for fold in FOLDS
             for stream in STREAMS
         ]
@@ -376,8 +388,9 @@ def evaluate_fold_stream(
     probabilities: np.ndarray,
     background: set[int],
     axis: str,
+    split_name: str,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    annotations = split_annotations(continuous_pkl_path(data_root, condition, fold), "test")
+    annotations = split_annotations(continuous_pkl_path(data_root, condition, fold), split_name)
     groups = grouped_sequences(annotations, probabilities)
 
     record_rows: list[dict[str, Any]] = []
@@ -398,6 +411,7 @@ def evaluate_fold_stream(
             {
                 "condition": condition.key,
                 "fold": fold,
+                "split": split_name,
                 "stream": stream,
                 "session_name": session_name,
                 "axis": axis,
@@ -408,6 +422,7 @@ def evaluate_fold_stream(
     fold_row: dict[str, Any] = {
         "condition": condition.key,
         "fold": fold,
+        "split": split_name,
         "stream": stream,
         "axis": axis,
         "num_recordings": len(groups),
@@ -462,13 +477,18 @@ def format_mean_sd(mean: float, sd: float) -> str:
     return f"{mean:.2f} +- {sd:.2f}"
 
 
-def markdown_report(fold_rows: list[dict[str, Any]], summary_rows: list[dict[str, Any]]) -> str:
+def markdown_report(
+    fold_rows: list[dict[str, Any]],
+    summary_rows: list[dict[str, Any]],
+    split_name: str,
+) -> str:
+    split_label = "validation" if split_name == "val" else split_name
     lines = [
-        "# E1 Continuous Segmental Metrics",
+        f"# E1 Continuous Segmental Metrics ({split_label})",
         "",
-        "Each test recording is evaluated independently. Segmental F1 pools TP,",
-        "FP, and FN counts across recordings within the fold. Edit is normalized",
-        "per recording and then averaged across recordings in the fold.",
+        f"Each {split_label} recording is evaluated independently. Segmental F1",
+        "pools TP, FP, and FN counts across recordings within the fold. Edit is",
+        "normalized per recording and then averaged across recordings in the fold.",
         "",
         "## Mean +- SD Across Folds",
         "",
@@ -520,17 +540,20 @@ def evaluate_continuous_segmental(
     output_dir: Path,
     background: set[int] | None = None,
     axis: str = "sequence_index",
+    split_name: str = "test",
+    result_subdir: str | None = None,
+    output_prefix: str = "e1_continuous_segmental",
 ) -> dict[str, Any]:
     background = set() if background is None else set(background)
     fold_rows: list[dict[str, Any]] = []
     recording_rows: list[dict[str, Any]] = []
     score_format_rows: list[dict[str, Any]] = []
 
-    for condition in active_conditions(work_root):
+    for condition in active_conditions(work_root, result_subdir):
         for fold in FOLDS:
             stream_probs: dict[str, np.ndarray] = {}
             for stream in STREAMS:
-                score_path = result_path(work_root, fold, stream, condition)
+                score_path = result_path(work_root, fold, stream, condition, result_subdir)
                 scores = load_scores(score_path)
                 probabilities, score_format = to_probabilities(scores)
                 stream_probs[stream] = probabilities
@@ -538,6 +561,7 @@ def evaluate_continuous_segmental(
                     {
                         "condition": condition.key,
                         "fold": fold,
+                        "split": split_name,
                         "stream": stream,
                         "score_path": str(score_path),
                         "score_format": score_format,
@@ -552,6 +576,7 @@ def evaluate_continuous_segmental(
                     probabilities=probabilities,
                     background=background,
                     axis=axis,
+                    split_name=split_name,
                 )
                 fold_rows.append(fold_row)
                 recording_rows.extend(record_rows)
@@ -566,21 +591,24 @@ def evaluate_continuous_segmental(
                 probabilities=fusion_probabilities,
                 background=background,
                 axis=axis,
+                split_name=split_name,
             )
             fold_rows.append(fold_row)
             recording_rows.extend(record_rows)
 
     summary_rows = aggregate_mean_sd(fold_rows)
     output_dir.mkdir(parents=True, exist_ok=True)
-    write_csv(output_dir / "e1_continuous_segmental_fold_metrics.csv", fold_rows)
-    write_csv(output_dir / "e1_continuous_segmental_recording_metrics.csv", recording_rows)
-    write_csv(output_dir / "e1_continuous_segmental_mean_sd.csv", summary_rows)
+    write_csv(output_dir / f"{output_prefix}_fold_metrics.csv", fold_rows)
+    write_csv(output_dir / f"{output_prefix}_recording_metrics.csv", recording_rows)
+    write_csv(output_dir / f"{output_prefix}_mean_sd.csv", summary_rows)
     write_json(
-        output_dir / "e1_continuous_segmental_summary.json",
+        output_dir / f"{output_prefix}_summary.json",
         {
+            "split": split_name,
             "labels": LABELS,
             "background_label_ids": sorted(background),
             "overlap_axis": axis,
+            "result_subdir": result_subdir,
             "fold_metrics": fold_rows,
             "recording_metrics": recording_rows,
             "mean_sd": summary_rows,
@@ -596,8 +624,8 @@ def evaluate_continuous_segmental(
             ),
         },
     )
-    (output_dir / "e1_continuous_segmental_summary.md").write_text(
-        markdown_report(fold_rows, summary_rows),
+    (output_dir / f"{output_prefix}_summary.md").write_text(
+        markdown_report(fold_rows, summary_rows, split_name),
         encoding="utf-8",
         newline="\n",
     )
@@ -630,6 +658,22 @@ def parse_args() -> argparse.Namespace:
         default="sequence_index",
         help="Axis used for segment IoU intervals.",
     )
+    parser.add_argument(
+        "--split-name",
+        choices=["train", "val", "test"],
+        default="test",
+        help="PYSKL split name to evaluate.",
+    )
+    parser.add_argument(
+        "--result-subdir",
+        default=None,
+        help="Optional result subdirectory below each condition, e.g. validation.",
+    )
+    parser.add_argument(
+        "--output-prefix",
+        default="e1_continuous_segmental",
+        help="Prefix for generated report filenames.",
+    )
     return parser.parse_args()
 
 
@@ -642,6 +686,9 @@ def main() -> None:
         output_dir=args.output_dir,
         background=background,
         axis=args.overlap_axis,
+        split_name=args.split_name,
+        result_subdir=args.result_subdir,
+        output_prefix=args.output_prefix,
     )
     print(f"[DONE] wrote continuous segmental reports under {args.output_dir}")
 

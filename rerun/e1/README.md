@@ -177,6 +177,24 @@ Submit all validation inference jobs from the repository root with:
 bash rerun/e1/slurm/submit_validation_jobs.sh
 ```
 
+The same validation inference can be run locally on CPU under WSL if the local
+environment can import `torch`, `mmcv`, and `pyskl`:
+
+```bash
+bash rerun/e1/local/run_validation_cpu.sh
+```
+
+Useful local overrides:
+
+```bash
+BATCH_SIZE=64 NUM_THREADS=16 bash rerun/e1/local/run_validation_cpu.sh
+PYTHON=/path/to/venv/bin/python bash rerun/e1/local/run_validation_cpu.sh
+```
+
+The CPU runner writes the same validation output files as the SLURM jobs. It is
+intended for validation inference only; training and checkpoint selection still
+come from the completed E1 runs.
+
 After all validation jobs finish, summarize validation metrics with:
 
 ```powershell
@@ -190,6 +208,11 @@ rerun/e1/reports/e1_validation_fold_metrics.csv
 rerun/e1/reports/e1_validation_mean_sd.csv
 rerun/e1/reports/e1_validation_summary.json
 rerun/e1/reports/e1_validation_summary.md
+rerun/e1/reports/e1_validation_continuous_segmental_fold_metrics.csv
+rerun/e1/reports/e1_validation_continuous_segmental_recording_metrics.csv
+rerun/e1/reports/e1_validation_continuous_segmental_mean_sd.csv
+rerun/e1/reports/e1_validation_continuous_segmental_summary.json
+rerun/e1/reports/e1_validation_continuous_segmental_summary.md
 ```
 
 Validation fusion predictions and metrics are written under:
@@ -197,6 +220,11 @@ Validation fusion predictions and metrics are written under:
 ```text
 work_dirs/rerun/e1/fold_<fold>/fusion/<condition>/validation/
 ```
+
+The validation summary also computes continuous-window segmental metrics for
+A2, B, and C using the validation predictions under each condition's
+`validation/` result subdirectory. A1 is excluded from segmental reporting
+because it is an activity-aligned evaluation, not a continuous-window sequence.
 
 ## Continuous Segmental Metrics
 

@@ -3,7 +3,7 @@
 #SBATCH --gpus-per-node=a100:4
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=62G
-#SBATCH --time=01:00:00
+#SBATCH --time=02:00:00
 #SBATCH --job-name=e1_val_fold_a_joint
 #SBATCH --output=rerun/e1/slurm/%x_%j.out
 #SBATCH --mail-user=yunzelu@outlook.com
