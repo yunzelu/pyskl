@@ -129,3 +129,144 @@ logic treats a strictly greater score as a new best, so an exact tie does not
 intentionally replace the current best. If multiple best checkpoint files
 remain, PYSKL's post-training `--test-best` fallback selects the best file with
 the largest epoch id.
+
+## Generate OOF Pseudo Labels
+
+After the 24 inner-teacher stream checkpoints exist under:
+
+```text
+work_dirs/rerun/pseudo_labeling/inner_teachers/fold_<fold>/t<id>/<stream>/
+```
+
+generate one Joint+Bone teacher system at a time:
+
+```bash
+python rerun/pseudo_labeling/run_inner_teacher_oof_pseudo_labeling.py \
+  --fold a \
+  --teacher t1 \
+  --device cuda \
+  --num-passes 30
+```
+
+Each teacher job performs:
+
+- 30-pass MC dropout on the fixed outer calibration subject
+- equal probability fusion inside each pass
+- post-fusion pool-temperature fitting on the calibration subject
+- calibration-set raw MC MI 95th percentile estimation
+- 30-pass MC dropout on the teacher's two pseudo-target subjects
+- training-safe pseudo table, audit table, and compressed MC archives
+
+Default output root:
+
+```text
+data/radar_v4/rerun/yolo26xpose/pseudo_labels_v1/
+```
+
+Per-teacher output:
+
+```text
+fold_<fold>/t<id>/
+├── teacher_metadata.json
+├── calibration_predictions.parquet
+├── calibration_mc_fused_samples.npz
+├── pseudo_predictions.parquet
+├── pseudo_predictions_audit.parquet
+└── mc_fused_samples.npz
+```
+
+`pseudo_predictions.parquet` is radar-training-safe and does not contain manual
+activity labels. `pseudo_predictions_audit.parquet` contains the same rows plus
+manual center label, pseudo-label correctness, and distance to the nearest
+manual annotation boundary in original RGB frame units.
+
+The full MC archive stores:
+
+```text
+sample_ids
+fused_mc_probabilities    # [30, N, 9]
+source_frame_indices      # [N, 60]
+timestamps_sec            # [N, 60]
+```
+
+The main table stores only compact start/center/end frame fields; the NPZ keeps
+the complete 60-frame source mapping for gap and alignment audits.
+
+Index convention:
+
+- `window_start_retained_idx`, `center_retained_idx`, and
+  `window_end_retained_idx_exclusive` are indices in the filtered retained
+  skeleton sequence.
+- `window_candidate_index = window_start_retained_idx / 12`, the original
+  sliding-window candidate index within that retained sequence.
+- `accepted_window_index_in_recording` is parsed from the generated
+  `win000000` sample token and counts only accepted windows.
+- source time uses the original RGB frame/timestamp fields, never
+  `center_retained_idx / 30`.
+
+### H100 Jobs
+
+Generate H100 SLURM scripts:
+
+```bash
+python rerun/pseudo_labeling/generate_oof_pseudo_label_slurm.py --overwrite
+```
+
+This writes:
+
+```text
+rerun/pseudo_labeling/slurm/oof_pseudo_labels_h100/run_oof_fold_<fold>_t<id>_h100.sh
+rerun/pseudo_labeling/slurm/oof_pseudo_labels_h100/run_aggregate_fold_<fold>_h100.sh
+rerun/pseudo_labeling/slurm/oof_pseudo_labels_h100/submit_oof_teacher_jobs_h100.sh
+rerun/pseudo_labeling/slurm/oof_pseudo_labels_h100/submit_oof_aggregation_jobs_h100.sh
+rerun/pseudo_labeling/slurm/oof_pseudo_labels_h100/submit_oof_all_with_dependencies_h100.sh
+```
+
+Submit the full stage with fold-level aggregation dependencies:
+
+```bash
+bash rerun/pseudo_labeling/slurm/oof_pseudo_labels_h100/submit_oof_all_with_dependencies_h100.sh
+```
+
+The teacher jobs use the H100 environment:
+
+```bash
+#SBATCH --gpus=nvidia_h100_80gb_hbm3_3g.40gb:1
+module purge
+module load StdEnv/2023
+module load python/3.10
+module load opencv/4.8.1
+source "/project/def-mbolic/yunzelu/pyskl/.venv/bin/activate"
+cd "/project/def-mbolic/yunzelu/pyskl"
+```
+
+Aggregation is CPU-only and should run after the four teacher jobs for the
+corresponding fold.
+
+### Step 6 Aggregation
+
+Fold aggregation is:
+
+```bash
+python rerun/pseudo_labeling/aggregate_oof_pseudo_labels.py --folds a b c
+```
+
+It writes:
+
+```text
+fold_<fold>/oof_skeleton_pseudo_labels.parquet
+fold_<fold>/oof_skeleton_pseudo_labels_audit.parquet
+fold_<fold>/radar_teacher_alignment.parquet
+fold_<fold>/fold_metadata.json
+```
+
+Validation checks:
+
+- every outer-training subject appears exactly once in the fold
+- every skeleton sample ID appears exactly once
+- every row was predicted by a teacher that excluded that subject
+- validation, calibration, and outer test subjects are absent
+- the radar-training-safe files contain no manual-label fields
+
+Parquet output requires `pyarrow` or `pandas` with a Parquet engine in the
+cluster virtual environment.
