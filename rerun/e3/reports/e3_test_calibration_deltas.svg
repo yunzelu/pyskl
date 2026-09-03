@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="360" viewBox="0 0 860 360">
+<rect width="100%" height="100%" fill="#ffffff" />
+<text x="430" y="24" text-anchor="middle" font-size="18" font-weight="700">E3 Test Calibration Deltas</text>
+<line x1="70" y1="170.0" x2="825" y2="170.0" stroke="#333" stroke-width="1.2" />
+<line x1="70" y1="45" x2="70" y2="295" stroke="#333" stroke-width="1" />
+<line x1="70" y1="295" x2="825" y2="295" stroke="#333" stroke-width="1" />
+<text x="430" y="342" text-anchor="middle" font-size="11" fill="#555">Delta = calibrated - raw. Negative is better.</text>
+<line x1="66" y1="295.0" x2="70" y2="295.0" stroke="#333" />
+<text x="62" y="299.0" text-anchor="end" font-size="10">-0.009</text>
+<line x1="66" y1="170.0" x2="70" y2="170.0" stroke="#333" />
+<text x="62" y="174.0" text-anchor="end" font-size="10">0.000</text>
+<line x1="66" y1="45.0" x2="70" y2="45.0" stroke="#333" />
+<text x="62" y="49.0" text-anchor="end" font-size="10">0.009</text>
+<line x1="195.8" y1="99.2" x2="195.8" y2="189.8" stroke="#111" stroke-width="1.5" />
+<line x1="183.8" y1="144.5" x2="207.8" y2="144.5" stroke="#111" stroke-width="3" />
+<circle cx="177.8" cy="169.7" r="5" fill="#2f6fed"><title>Fold A Delta NLL: 0.0000</title></circle>
+<circle cx="195.8" cy="171.6" r="5" fill="#c75a2a"><title>Fold B Delta NLL: -0.0001</title></circle>
+<circle cx="213.8" cy="92.2" r="5" fill="#278456"><title>Fold C Delta NLL: 0.0057</title></circle>
+<text x="195.8" y="319" text-anchor="middle" font-size="12">Delta NLL</text>
+<line x1="447.5" y1="160.7" x2="447.5" y2="172.1" stroke="#111" stroke-width="1.5" />
+<line x1="435.5" y1="166.4" x2="459.5" y2="166.4" stroke="#111" stroke-width="3" />
+<circle cx="429.5" cy="170.6" r="5" fill="#2f6fed"><title>Fold A Delta Brier: -0.0000</title></circle>
+<circle cx="447.5" cy="168.8" r="5" fill="#c75a2a"><title>Fold B Delta Brier: 0.0001</title></circle>
+<circle cx="465.5" cy="159.8" r="5" fill="#278456"><title>Fold C Delta Brier: 0.0007</title></circle>
+<text x="447.5" y="319" text-anchor="middle" font-size="12">Delta Brier</text>
+<line x1="699.2" y1="78.2" x2="699.2" y2="194.9" stroke="#111" stroke-width="1.5" />
+<line x1="687.2" y1="136.5" x2="711.2" y2="136.5" stroke="#111" stroke-width="3" />
+<circle cx="681.2" cy="179.0" r="5" fill="#2f6fed"><title>Fold A Delta ECE: -0.0007</title></circle>
+<circle cx="699.2" cy="160.5" r="5" fill="#c75a2a"><title>Fold B Delta ECE: 0.0007</title></circle>
+<circle cx="717.2" cy="70.0" r="5" fill="#278456"><title>Fold C Delta ECE: 0.0073</title></circle>
+<text x="699.2" y="319" text-anchor="middle" font-size="12">Delta ECE</text>
+</svg>
