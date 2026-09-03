@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --account=def-mbolic
-#SBATCH --gpus-per-node=h100:4
-#SBATCH --cpus-per-task=24
-#SBATCH --mem=128G
-#SBATCH --time=06:00:00
+#SBATCH --gpus=nvidia_h100_80gb_hbm3_3g.40gb:1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=48G
+#SBATCH --time=01:00:00
 #SBATCH --job-name=e2a_laplace
 #SBATCH --output=rerun/e2/slurm/%x_%j.out
 #SBATCH --mail-user=yunzelu@outlook.com
