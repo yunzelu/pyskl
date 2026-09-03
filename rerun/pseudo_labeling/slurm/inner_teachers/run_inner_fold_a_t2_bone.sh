@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --account=def-mbolic
-#SBATCH --gpus-per-node=a100:4
+#SBATCH --gpus-per-node=h100:4
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=62G
 #SBATCH --time=02:00:00
