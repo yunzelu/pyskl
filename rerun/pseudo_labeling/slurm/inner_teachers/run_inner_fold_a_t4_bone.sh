@@ -3,7 +3,7 @@
 #SBATCH --gpus-per-node=h100:4
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=62G
-#SBATCH --time=02:00:00
+#SBATCH --time=00:50:00
 #SBATCH --job-name=pl_inner_a_t4_bone
 #SBATCH --output=rerun/pseudo_labeling/slurm/inner_teachers/%x_%j.out
 #SBATCH --mail-user=yunzelu@outlook.com
