@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --account=def-mbolic
-#SBATCH --gpus=nvidia_h100_80gb_hbm3_3g.40gb:1
+#SBATCH --gpus=nvidia_h100_80gb_hbm3_2g.20gb:1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=62G
 #SBATCH --time=00:20:00
@@ -29,10 +29,6 @@ EXTRA_ARGS=()
 
 if [[ "${OVERWRITE:-0}" == "1" ]]; then
   EXTRA_ARGS+=(--overwrite)
-fi
-
-if [[ "${WRITE_CSV_COPY:-0}" == "1" ]]; then
-  EXTRA_ARGS+=(--write-csv-copy)
 fi
 
 if [[ "${SAVE_STREAM_PASS_PROBABILITIES:-0}" == "1" ]]; then

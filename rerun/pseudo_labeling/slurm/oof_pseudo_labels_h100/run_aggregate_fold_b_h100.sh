@@ -19,11 +19,5 @@ source "/project/def-mbolic/yunzelu/pyskl/.venv/bin/activate"
 cd "/project/def-mbolic/yunzelu/pyskl"
 
 
-EXTRA_ARGS=()
-if [[ "${WRITE_CSV_COPY:-0}" == "1" ]]; then
-  EXTRA_ARGS+=(--write-csv-copy)
-fi
-
 python rerun/pseudo_labeling/aggregate_oof_pseudo_labels.py \
-  --folds b \
-  "${EXTRA_ARGS[@]}"
+  --folds b

@@ -8,7 +8,7 @@ generation protocol for one outer fold and one inner teacher:
 3. Fit one post-fusion pool-temperature on the calibration MC mean.
 4. Use calibration-set raw MC MI to estimate the teacher-specific q95 scale.
 5. Run 30-pass MC-dropout inference on the two pseudo-target subjects and
-   save training-safe pseudo labels, audit labels, and full fused MC passes.
+   save training-safe pseudo-label CSVs, audit CSVs, and full fused MC passes.
 
 The radar-training-safe pseudo table intentionally omits manual labels. The
 audit table keeps manual labels and boundary distance for diagnostics only.
@@ -169,56 +169,6 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
-
-
-def write_parquet(path: Path, rows: list[dict[str, Any]]) -> None:
-    """Write row dictionaries to Parquet using pyarrow or pandas."""
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not rows:
-        raise ValueError(f"No rows to write for {path}")
-
-    try:
-        import pyarrow as pa
-        import pyarrow.parquet as pq
-
-        table = pa.Table.from_pylist(json_ready(rows))
-        pq.write_table(table, path)
-        return
-    except ModuleNotFoundError:
-        pass
-
-    try:
-        import pandas as pd
-
-        pd.DataFrame(rows).to_parquet(path, index=False)
-        return
-    except (ModuleNotFoundError, ImportError) as exc:
-        raise RuntimeError(
-            "Writing Parquet requires either pyarrow or pandas with a Parquet "
-            "engine installed in the active environment."
-        ) from exc
-
-
-def read_parquet(path: Path) -> list[dict[str, Any]]:
-    """Read a Parquet table into row dictionaries using pyarrow or pandas."""
-
-    try:
-        import pyarrow.parquet as pq
-
-        return pq.read_table(path).to_pylist()
-    except ModuleNotFoundError:
-        pass
-
-    try:
-        import pandas as pd
-
-        return pd.read_parquet(path).to_dict(orient="records")
-    except (ModuleNotFoundError, ImportError) as exc:
-        raise RuntimeError(
-            "Reading Parquet requires either pyarrow or pandas with a Parquet "
-            "engine installed in the active environment."
-        ) from exc
 
 
 def normalized_existing_path(value: Any) -> Path:
@@ -1122,7 +1072,7 @@ def write_global_metadata_files(output_root: Path) -> None:
         {
             "schema_version": SCHEMA_VERSION,
             "dataset_id": DATASET_ID,
-            "row_level_pseudo_label_format": "parquet",
+            "row_level_pseudo_label_format": "csv",
             "full_mc_array_format": "compressed_npz",
             "window_definition": {
                 "window_size": WINDOW_SIZE,
@@ -1157,10 +1107,8 @@ def write_global_metadata_files(output_root: Path) -> None:
     )
 
 
-def write_rows(path: Path, rows: list[dict[str, Any]], write_csv_copy: bool) -> None:
-    write_parquet(path, rows)
-    if write_csv_copy:
-        write_csv(path.with_suffix(".csv"), rows)
+def write_rows(path: Path, rows: list[dict[str, Any]]) -> None:
+    write_csv(path, rows)
 
 
 def run_teacher(args: argparse.Namespace) -> None:
@@ -1284,9 +1232,9 @@ def run_teacher(args: argparse.Namespace) -> None:
             f"Pseudo-target row count {len(pseudo_safe_rows)} does not match expected {expected_pseudo}"
         )
 
-    write_rows(teacher_root / "calibration_predictions.parquet", calibration_rows, args.write_csv_copy)
-    write_rows(teacher_root / "pseudo_predictions.parquet", pseudo_safe_rows, args.write_csv_copy)
-    write_rows(teacher_root / "pseudo_predictions_audit.parquet", pseudo_audit_rows, args.write_csv_copy)
+    write_rows(teacher_root / "calibration_predictions.csv", calibration_rows)
+    write_rows(teacher_root / "pseudo_predictions.csv", pseudo_safe_rows)
+    write_rows(teacher_root / "pseudo_predictions_audit.csv", pseudo_audit_rows)
 
     calibration_sample_ids = [row["skeleton_sample_id"] for row in calibration_rows]
     pseudo_sample_ids = [row["skeleton_sample_id"] for row in pseudo_safe_rows]
@@ -1354,9 +1302,9 @@ def run_teacher(args: argparse.Namespace) -> None:
             "expected_pseudo_target_windows": expected_pseudo,
         },
         "outputs": {
-            "calibration_predictions": teacher_root / "calibration_predictions.parquet",
-            "pseudo_predictions": teacher_root / "pseudo_predictions.parquet",
-            "pseudo_predictions_audit": teacher_root / "pseudo_predictions_audit.parquet",
+            "calibration_predictions": teacher_root / "calibration_predictions.csv",
+            "pseudo_predictions": teacher_root / "pseudo_predictions.csv",
+            "pseudo_predictions_audit": teacher_root / "pseudo_predictions_audit.csv",
             "calibration_mc_fused_samples": teacher_root / "calibration_mc_fused_samples.npz",
             "mc_fused_samples": teacher_root / "mc_fused_samples.npz",
         },
@@ -1400,7 +1348,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sanity-atol", type=float, default=1e-7)
     parser.add_argument("--skip-checkpoint-hash", action="store_true")
     parser.add_argument("--save-stream-pass-probabilities", action="store_true")
-    parser.add_argument("--write-csv-copy", action="store_true")
     parser.add_argument("--eps", type=float, default=1e-12)
     parser.add_argument("--temperature-max-iter", type=int, default=100)
     parser.add_argument("--temperature-lr", type=float, default=0.1)

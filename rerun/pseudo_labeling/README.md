@@ -168,15 +168,15 @@ Per-teacher output:
 ```text
 fold_<fold>/t<id>/
 ├── teacher_metadata.json
-├── calibration_predictions.parquet
+├── calibration_predictions.csv
 ├── calibration_mc_fused_samples.npz
-├── pseudo_predictions.parquet
-├── pseudo_predictions_audit.parquet
+├── pseudo_predictions.csv
+├── pseudo_predictions_audit.csv
 └── mc_fused_samples.npz
 ```
 
-`pseudo_predictions.parquet` is radar-training-safe and does not contain manual
-activity labels. `pseudo_predictions_audit.parquet` contains the same rows plus
+`pseudo_predictions.csv` is radar-training-safe and does not contain manual
+activity labels. `pseudo_predictions_audit.csv` contains the same rows plus
 manual center label, pseudo-label correctness, and distance to the nearest
 manual annotation boundary in original RGB frame units.
 
@@ -231,7 +231,7 @@ bash rerun/pseudo_labeling/slurm/oof_pseudo_labels_h100/submit_oof_all_with_depe
 The teacher jobs use the H100 environment:
 
 ```bash
-#SBATCH --gpus=nvidia_h100_80gb_hbm3_3g.40gb:1
+#SBATCH --gpus=nvidia_h100_80gb_hbm3_2g.20gb:1
 module purge
 module load StdEnv/2023
 module load python/3.10
@@ -254,9 +254,9 @@ python rerun/pseudo_labeling/aggregate_oof_pseudo_labels.py --folds a b c
 It writes:
 
 ```text
-fold_<fold>/oof_skeleton_pseudo_labels.parquet
-fold_<fold>/oof_skeleton_pseudo_labels_audit.parquet
-fold_<fold>/radar_teacher_alignment.parquet
+fold_<fold>/oof_skeleton_pseudo_labels.csv
+fold_<fold>/oof_skeleton_pseudo_labels_audit.csv
+fold_<fold>/radar_teacher_alignment.csv
 fold_<fold>/fold_metadata.json
 ```
 
@@ -268,5 +268,7 @@ Validation checks:
 - validation, calibration, and outer test subjects are absent
 - the radar-training-safe files contain no manual-label fields
 
-Parquet output requires `pyarrow` or `pandas` with a Parquet engine in the
-cluster virtual environment.
+The row-level tables are CSV files because the H100 cluster environment does
+not provide a Parquet backend. Existing stream MC arrays are reused when
+present, so rerunning a failed teacher job can continue to CSV/NPZ table
+writing without recomputing completed stream outputs.

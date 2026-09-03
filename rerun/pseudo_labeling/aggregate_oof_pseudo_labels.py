@@ -1,12 +1,12 @@
 """Concatenate inner-teacher pseudo labels into canonical fold-level OOF files.
 
 This is step 6 of the pseudo-labeling protocol. It combines the four
-teacher-level pseudo-target files within one outer fold, validates the
+teacher-level pseudo-target CSV files within one outer fold, validates the
 cross-fitting partition, and writes:
 
-- oof_skeleton_pseudo_labels.parquet
-- oof_skeleton_pseudo_labels_audit.parquet
-- radar_teacher_alignment.parquet
+- oof_skeleton_pseudo_labels.csv
+- oof_skeleton_pseudo_labels_audit.csv
+- radar_teacher_alignment.csv
 
 The first and third files are radar-training-safe and do not contain manual
 activity labels. The audit file contains manual labels and correctness fields
@@ -38,8 +38,6 @@ from rerun.pseudo_labeling.run_inner_teacher_oof_pseudo_labeling import (  # noq
     write_csv,
     write_global_metadata_files,
     write_json,
-    write_parquet,
-    read_parquet,
 )
 
 
@@ -106,10 +104,13 @@ def teacher_root(output_root: Path, fold: str, teacher: str) -> Path:
     return output_root / f"fold_{fold}" / teacher
 
 
-def write_rows(path: Path, rows: list[dict[str, Any]], write_csv_copy: bool) -> None:
-    write_parquet(path, rows)
-    if write_csv_copy:
-        write_csv(path.with_suffix(".csv"), rows)
+def write_rows(path: Path, rows: list[dict[str, Any]]) -> None:
+    write_csv(path, rows)
+
+
+def read_csv_rows(path: Path) -> list[dict[str, Any]]:
+    with path.open("r", encoding="utf-8", newline="") as f:
+        return list(csv.DictReader(f))
 
 
 def sorted_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -306,15 +307,15 @@ def aggregate_fold(args: argparse.Namespace, fold: str) -> dict[str, Any]:
 
     for teacher in sorted(FOLDS[fold]["teachers"]):
         root = teacher_root(args.output_root, fold, teacher)
-        safe_path = root / "pseudo_predictions.parquet"
-        audit_path = root / "pseudo_predictions_audit.parquet"
+        safe_path = root / "pseudo_predictions.csv"
+        audit_path = root / "pseudo_predictions_audit.csv"
         metadata_path = root / "teacher_metadata.json"
         for path in [safe_path, audit_path, metadata_path, root / "mc_fused_samples.npz"]:
             if not path.exists():
                 raise FileNotFoundError(path)
 
-        safe_rows.extend(read_parquet(safe_path))
-        audit_rows.extend(read_parquet(audit_path))
+        safe_rows.extend(read_csv_rows(safe_path))
+        audit_rows.extend(read_csv_rows(audit_path))
         metadata_by_teacher[teacher] = read_json(metadata_path)
 
     safe_rows = sorted_rows(safe_rows)
@@ -325,9 +326,9 @@ def aggregate_fold(args: argparse.Namespace, fold: str) -> dict[str, Any]:
     assert_unique(alignment_rows, "skeleton_sample_id", f"fold {fold} radar alignment rows")
 
     write_global_metadata_files(args.output_root)
-    write_rows(fold_dir / "oof_skeleton_pseudo_labels.parquet", safe_rows, args.write_csv_copy)
-    write_rows(fold_dir / "oof_skeleton_pseudo_labels_audit.parquet", audit_rows, args.write_csv_copy)
-    write_rows(fold_dir / "radar_teacher_alignment.parquet", alignment_rows, args.write_csv_copy)
+    write_rows(fold_dir / "oof_skeleton_pseudo_labels.csv", safe_rows)
+    write_rows(fold_dir / "oof_skeleton_pseudo_labels_audit.csv", audit_rows)
+    write_rows(fold_dir / "radar_teacher_alignment.csv", alignment_rows)
     write_json(
         fold_dir / "fold_metadata.json",
         {
@@ -336,9 +337,9 @@ def aggregate_fold(args: argparse.Namespace, fold: str) -> dict[str, Any]:
             "dataset_id": DATASET_ID,
             "fold": fold.upper(),
             "window_size": WINDOW_SIZE,
-            "safe_output": fold_dir / "oof_skeleton_pseudo_labels.parquet",
-            "audit_output": fold_dir / "oof_skeleton_pseudo_labels_audit.parquet",
-            "alignment_output": fold_dir / "radar_teacher_alignment.parquet",
+            "safe_output": fold_dir / "oof_skeleton_pseudo_labels.csv",
+            "audit_output": fold_dir / "oof_skeleton_pseudo_labels_audit.csv",
+            "alignment_output": fold_dir / "radar_teacher_alignment.csv",
             "teacher_metadata": metadata_by_teacher,
             "validation_checks": summary,
             "training_safe_files_exclude_manual_labels": True,
@@ -370,9 +371,9 @@ def run(args: argparse.Namespace) -> None:
             "output_root": args.output_root,
             "folds": folds,
             "summaries": summaries,
-            "training_safe_file": "fold_<fold>/oof_skeleton_pseudo_labels.parquet",
-            "audit_file": "fold_<fold>/oof_skeleton_pseudo_labels_audit.parquet",
-            "radar_alignment_manifest": "fold_<fold>/radar_teacher_alignment.parquet",
+            "training_safe_file": "fold_<fold>/oof_skeleton_pseudo_labels.csv",
+            "audit_file": "fold_<fold>/oof_skeleton_pseudo_labels_audit.csv",
+            "radar_alignment_manifest": "fold_<fold>/radar_teacher_alignment.csv",
         },
     )
     print(f"[DONE] wrote aggregation reports under {args.report_dir}")
@@ -391,7 +392,6 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=Path("rerun/pseudo_labeling/reports/oof_pseudo_labels_v1"),
     )
-    parser.add_argument("--write-csv-copy", action="store_true")
     return parser.parse_args()
 
 
