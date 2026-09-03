@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="620" viewBox="0 0 980 620">
+<rect width="100%" height="100%" fill="#ffffff" />
+<text x="490" y="24" text-anchor="middle" font-size="18" font-weight="700">E2B Error-Ranking Reliability, Mean +- SD Across Folds</text>
+<text x="490" y="604" text-anchor="middle" font-size="11" fill="#555">Bars show fold mean; whiskers show SD; points show individual folds. Dashed line marks AUROC chance level.</text>
+<text x="250.0" y="63" text-anchor="middle" font-size="14" font-weight="600">Error AUROC</text>
+<line x1="70" y1="250" x2="462" y2="250" stroke="#222" stroke-width="1" />
+<line x1="70" y1="75" x2="70" y2="250" stroke="#222" stroke-width="1" />
+<line x1="66" y1="250.0" x2="70" y2="250.0" stroke="#222" stroke-width="1" />
+<text x="62" y="254.0" text-anchor="end" font-size="10">0.0</text>
+<line x1="66" y1="162.5" x2="70" y2="162.5" stroke="#222" stroke-width="1" />
+<text x="62" y="166.5" text-anchor="end" font-size="10">0.5</text>
+<line x1="70" y1="162.5" x2="462" y2="162.5" stroke="#888" stroke-width="1" stroke-dasharray="4 4" />
+<line x1="66" y1="75.0" x2="70" y2="75.0" stroke="#222" stroke-width="1" />
+<text x="62" y="79.0" text-anchor="end" font-size="10">1.0</text>
+<rect x="178.4" y="88.7" width="42" height="161.3" fill="#2f6fed" opacity="0.78" />
+<line x1="199.4" y1="85.2" x2="199.4" y2="92.2" stroke="#111" stroke-width="1.4" />
+<line x1="190.4" y1="85.2" x2="208.4" y2="85.2" stroke="#111" stroke-width="1.4" />
+<line x1="190.4" y1="92.2" x2="208.4" y2="92.2" stroke="#111" stroke-width="1.4" />
+<circle cx="186.4" cy="92.8" r="4" fill="#fff" stroke="#2f6fed" stroke-width="2"><title>MC dropout fold A: 0.8985</title></circle>
+<circle cx="199.4" cy="86.3" r="4" fill="#fff" stroke="#2f6fed" stroke-width="2"><title>MC dropout fold B: 0.9352</title></circle>
+<circle cx="212.4" cy="87.0" r="4" fill="#fff" stroke="#2f6fed" stroke-width="2"><title>MC dropout fold C: 0.9315</title></circle>
+<text x="199.4" y="268" text-anchor="middle" font-size="11">MC dropout</text>
+<rect x="311.6" y="89.2" width="42" height="160.8" fill="#c75a2a" opacity="0.78" />
+<line x1="332.6" y1="86.1" x2="332.6" y2="92.3" stroke="#111" stroke-width="1.4" />
+<line x1="323.6" y1="86.1" x2="341.6" y2="86.1" stroke="#111" stroke-width="1.4" />
+<line x1="323.6" y1="92.3" x2="341.6" y2="92.3" stroke="#111" stroke-width="1.4" />
+<circle cx="319.6" cy="92.8" r="4" fill="#fff" stroke="#c75a2a" stroke-width="2"><title>Laplace fold A: 0.8983</title></circle>
+<circle cx="332.6" cy="87.2" r="4" fill="#fff" stroke="#c75a2a" stroke-width="2"><title>Laplace fold B: 0.9304</title></circle>
+<circle cx="345.6" cy="87.6" r="4" fill="#fff" stroke="#c75a2a" stroke-width="2"><title>Laplace fold C: 0.9280</title></circle>
+<text x="332.6" y="268" text-anchor="middle" font-size="11">Laplace</text>
+<text x="730.0" y="63" text-anchor="middle" font-size="14" font-weight="600">Error AUPRC/AP</text>
+<line x1="550" y1="250" x2="942" y2="250" stroke="#222" stroke-width="1" />
+<line x1="550" y1="75" x2="550" y2="250" stroke="#222" stroke-width="1" />
+<line x1="546" y1="250.0" x2="550" y2="250.0" stroke="#222" stroke-width="1" />
+<text x="542" y="254.0" text-anchor="end" font-size="10">0.0</text>
+<line x1="546" y1="162.5" x2="550" y2="162.5" stroke="#222" stroke-width="1" />
+<text x="542" y="166.5" text-anchor="end" font-size="10">0.5</text>
+<line x1="550" y1="162.5" x2="942" y2="162.5" stroke="#888" stroke-width="1" stroke-dasharray="4 4" />
+<line x1="546" y1="75.0" x2="550" y2="75.0" stroke="#222" stroke-width="1" />
+<text x="542" y="79.0" text-anchor="end" font-size="10">1.0</text>
+<rect x="658.4" y="195.2" width="42" height="54.8" fill="#2f6fed" opacity="0.78" />
+<line x1="679.4" y1="187.9" x2="679.4" y2="202.4" stroke="#111" stroke-width="1.4" />
+<line x1="670.4" y1="187.9" x2="688.4" y2="187.9" stroke="#111" stroke-width="1.4" />
+<line x1="670.4" y1="202.4" x2="688.4" y2="202.4" stroke="#111" stroke-width="1.4" />
+<circle cx="666.4" cy="196.2" r="4" fill="#fff" stroke="#2f6fed" stroke-width="2"><title>MC dropout fold A: 0.3072</title></circle>
+<circle cx="679.4" cy="187.5" r="4" fill="#fff" stroke="#2f6fed" stroke-width="2"><title>MC dropout fold B: 0.3573</title></circle>
+<circle cx="692.4" cy="201.8" r="4" fill="#fff" stroke="#2f6fed" stroke-width="2"><title>MC dropout fold C: 0.2757</title></circle>
+<text x="679.4" y="268" text-anchor="middle" font-size="11">MC dropout</text>
+<rect x="791.6" y="194.4" width="42" height="55.6" fill="#c75a2a" opacity="0.78" />
+<line x1="812.6" y1="192.4" x2="812.6" y2="196.4" stroke="#111" stroke-width="1.4" />
+<line x1="803.6" y1="192.4" x2="821.6" y2="192.4" stroke="#111" stroke-width="1.4" />
+<line x1="803.6" y1="196.4" x2="821.6" y2="196.4" stroke="#111" stroke-width="1.4" />
+<circle cx="799.6" cy="195.4" r="4" fill="#fff" stroke="#c75a2a" stroke-width="2"><title>Laplace fold A: 0.3121</title></circle>
+<circle cx="812.6" cy="192.1" r="4" fill="#fff" stroke="#c75a2a" stroke-width="2"><title>Laplace fold B: 0.3311</title></circle>
+<circle cx="825.6" cy="195.7" r="4" fill="#fff" stroke="#c75a2a" stroke-width="2"><title>Laplace fold C: 0.3105</title></circle>
+<text x="812.6" y="268" text-anchor="middle" font-size="11">Laplace</text>
+<text x="250.0" y="348" text-anchor="middle" font-size="14" font-weight="600">State Error AUROC</text>
+<line x1="70" y1="535" x2="462" y2="535" stroke="#222" stroke-width="1" />
+<line x1="70" y1="360" x2="70" y2="535" stroke="#222" stroke-width="1" />
+<line x1="66" y1="535.0" x2="70" y2="535.0" stroke="#222" stroke-width="1" />
+<text x="62" y="539.0" text-anchor="end" font-size="10">0.0</text>
+<line x1="66" y1="447.5" x2="70" y2="447.5" stroke="#222" stroke-width="1" />
+<text x="62" y="451.5" text-anchor="end" font-size="10">0.5</text>
+<line x1="70" y1="447.5" x2="462" y2="447.5" stroke="#888" stroke-width="1" stroke-dasharray="4 4" />
+<line x1="66" y1="360.0" x2="70" y2="360.0" stroke="#222" stroke-width="1" />
+<text x="62" y="364.0" text-anchor="end" font-size="10">1.0</text>
+<rect x="178.4" y="370.0" width="42" height="165.0" fill="#2f6fed" opacity="0.78" />
+<line x1="199.4" y1="369.4" x2="199.4" y2="370.6" stroke="#111" stroke-width="1.4" />
+<line x1="190.4" y1="369.4" x2="208.4" y2="369.4" stroke="#111" stroke-width="1.4" />
+<line x1="190.4" y1="370.6" x2="208.4" y2="370.6" stroke="#111" stroke-width="1.4" />
+<circle cx="186.4" cy="369.3" r="4" fill="#fff" stroke="#2f6fed" stroke-width="2"><title>MC dropout fold A: 0.9467</title></circle>
+<circle cx="199.4" cy="370.1" r="4" fill="#fff" stroke="#2f6fed" stroke-width="2"><title>MC dropout fold B: 0.9421</title></circle>
+<circle cx="212.4" cy="370.5" r="4" fill="#fff" stroke="#2f6fed" stroke-width="2"><title>MC dropout fold C: 0.9397</title></circle>
+<text x="199.4" y="553" text-anchor="middle" font-size="11">MC dropout</text>
+<rect x="311.6" y="369.6" width="42" height="165.4" fill="#c75a2a" opacity="0.78" />
+<line x1="332.6" y1="367.0" x2="332.6" y2="372.2" stroke="#111" stroke-width="1.4" />
+<line x1="323.6" y1="367.0" x2="341.6" y2="367.0" stroke="#111" stroke-width="1.4" />
+<line x1="323.6" y1="372.2" x2="341.6" y2="372.2" stroke="#111" stroke-width="1.4" />
+<circle cx="319.6" cy="366.6" r="4" fill="#fff" stroke="#c75a2a" stroke-width="2"><title>Laplace fold A: 0.9624</title></circle>
+<circle cx="332.6" cy="371.1" r="4" fill="#fff" stroke="#c75a2a" stroke-width="2"><title>Laplace fold B: 0.9366</title></circle>
+<circle cx="345.6" cy="371.2" r="4" fill="#fff" stroke="#c75a2a" stroke-width="2"><title>Laplace fold C: 0.9362</title></circle>
+<text x="332.6" y="553" text-anchor="middle" font-size="11">Laplace</text>
+<text x="730.0" y="348" text-anchor="middle" font-size="14" font-weight="600">Transition Error AUROC</text>
+<line x1="550" y1="535" x2="942" y2="535" stroke="#222" stroke-width="1" />
+<line x1="550" y1="360" x2="550" y2="535" stroke="#222" stroke-width="1" />
+<line x1="546" y1="535.0" x2="550" y2="535.0" stroke="#222" stroke-width="1" />
+<text x="542" y="539.0" text-anchor="end" font-size="10">0.0</text>
+<line x1="546" y1="447.5" x2="550" y2="447.5" stroke="#222" stroke-width="1" />
+<text x="542" y="451.5" text-anchor="end" font-size="10">0.5</text>
+<line x1="550" y1="447.5" x2="942" y2="447.5" stroke="#888" stroke-width="1" stroke-dasharray="4 4" />
+<line x1="546" y1="360.0" x2="550" y2="360.0" stroke="#222" stroke-width="1" />
+<text x="542" y="364.0" text-anchor="end" font-size="10">1.0</text>
+<rect x="658.4" y="381.4" width="42" height="153.6" fill="#2f6fed" opacity="0.78" />
+<line x1="679.4" y1="367.4" x2="679.4" y2="395.4" stroke="#111" stroke-width="1.4" />
+<line x1="670.4" y1="367.4" x2="688.4" y2="367.4" stroke="#111" stroke-width="1.4" />
+<line x1="670.4" y1="395.4" x2="688.4" y2="395.4" stroke="#111" stroke-width="1.4" />
+<circle cx="666.4" cy="397.5" r="4" fill="#fff" stroke="#2f6fed" stroke-width="2"><title>MC dropout fold A: 0.7855</title></circle>
+<circle cx="679.4" cy="372.8" r="4" fill="#fff" stroke="#2f6fed" stroke-width="2"><title>MC dropout fold B: 0.9270</title></circle>
+<circle cx="692.4" cy="373.9" r="4" fill="#fff" stroke="#2f6fed" stroke-width="2"><title>MC dropout fold C: 0.9208</title></circle>
+<text x="679.4" y="553" text-anchor="middle" font-size="11">MC dropout</text>
+<rect x="791.6" y="382.7" width="42" height="152.3" fill="#c75a2a" opacity="0.78" />
+<line x1="812.6" y1="363.7" x2="812.6" y2="401.7" stroke="#111" stroke-width="1.4" />
+<line x1="803.6" y1="363.7" x2="821.6" y2="363.7" stroke="#111" stroke-width="1.4" />
+<line x1="803.6" y1="401.7" x2="821.6" y2="401.7" stroke="#111" stroke-width="1.4" />
+<circle cx="799.6" cy="404.6" r="4" fill="#fff" stroke="#c75a2a" stroke-width="2"><title>Laplace fold A: 0.7449</title></circle>
+<circle cx="812.6" cy="370.5" r="4" fill="#fff" stroke="#c75a2a" stroke-width="2"><title>Laplace fold B: 0.9401</title></circle>
+<circle cx="825.6" cy="373.0" r="4" fill="#fff" stroke="#c75a2a" stroke-width="2"><title>Laplace fold C: 0.9256</title></circle>
+<text x="812.6" y="553" text-anchor="middle" font-size="11">Laplace</text>
+</svg>

@@ -231,3 +231,44 @@ pbar_MC = mean_k p_MC^(k)
 The saved `mc_quantities.npz` also contains predictive entropy, expected
 entropy, mutual information, predictions, labels, and branch-specific errors
 for the later E2B reliability-ranking analysis.
+
+## E2B Self-Consistent Error Ranking
+
+E2B reads the fused validation artifacts from E2A MC-dropout and E2A Laplace:
+
+```bash
+python rerun/e2/evaluate_e2b_reliability.py
+```
+
+No extra Python package is required. The script implements binary AUROC and
+average precision directly. Error AUPRC is average precision:
+
+```text
+AP = sum_n (R_n - R_{n-1}) P_n
+```
+
+For each branch, the binary positive class is that branch's own activity error:
+
+```text
+e_i = 1[argmax(p_branch_i) != manual_center_label_i]
+```
+
+The uncertainty score is that same branch's mutual information. Therefore MC
+MI is evaluated against MC errors, and Laplace MI is evaluated against Laplace
+errors. Larger MI is always interpreted as more likely to be wrong.
+
+State and transition Error AUROC are calculated on subsets defined by the
+manual center label:
+
+- state: `lie-stationary`, `sit-stationary`, `walk`
+- transition: `fall` and the five `transition-*` classes
+
+Outputs:
+
+```text
+rerun/e2/reports/e2b_reliability_fold_metrics.csv
+rerun/e2/reports/e2b_reliability_mean_sd.csv
+rerun/e2/reports/e2b_reliability_summary.json
+rerun/e2/reports/e2b_reliability_summary.md
+rerun/e2/reports/e2b_reliability_spread.svg
+```
