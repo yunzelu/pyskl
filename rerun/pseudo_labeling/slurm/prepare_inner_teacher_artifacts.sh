@@ -11,8 +11,11 @@
 set -euo pipefail
 
 module purge
-module load StdEnv/2020 gcc/9.3.0 python/3.10
-source ~/projects/def-mbolic/yunzelu/pyskl/.venv/bin/activate
-cd ~/projects/def-mbolic/yunzelu/pyskl/
+module load StdEnv/2023
+module load python/3.10
+module load opencv/4.8.1
+
+source "/project/def-mbolic/yunzelu/pyskl/.venv/bin/activate"
+cd "/project/def-mbolic/yunzelu/pyskl"
 
 python rerun/pseudo_labeling/generate_inner_teacher_training_artifacts.py --overwrite

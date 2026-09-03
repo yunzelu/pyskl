@@ -12,9 +12,12 @@
 set -euo pipefail
 
 module purge
-module load StdEnv/2020 gcc/9.3.0 cuda/11.8 python/3.10 opencv/4.5.5
-source ~/projects/def-mbolic/yunzelu/pyskl/.venv/bin/activate
-cd ~/projects/def-mbolic/yunzelu/pyskl/
+module load StdEnv/2023
+module load python/3.10
+module load opencv/4.8.1
+
+source "/project/def-mbolic/yunzelu/pyskl/.venv/bin/activate"
+cd "/project/def-mbolic/yunzelu/pyskl"
 
 GPUS="${GPUS:-4}"
 SEED="${SEED:-42}"
