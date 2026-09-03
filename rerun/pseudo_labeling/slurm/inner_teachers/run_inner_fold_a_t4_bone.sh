@@ -1,0 +1,23 @@
+#!/bin/bash
+#SBATCH --account=def-mbolic
+#SBATCH --gpus-per-node=a100:4
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=62G
+#SBATCH --time=02:00:00
+#SBATCH --job-name=pl_inner_a_t4_bone
+#SBATCH --output=rerun/pseudo_labeling/slurm/inner_teachers/%x_%j.out
+#SBATCH --mail-user=yunzelu@outlook.com
+#SBATCH --mail-type=BEGIN,END,FAIL
+
+set -euo pipefail
+
+module purge
+module load StdEnv/2020 gcc/9.3.0 cuda/11.8 python/3.10 opencv/4.5.5
+source ~/projects/def-mbolic/yunzelu/pyskl/.venv/bin/activate
+cd ~/projects/def-mbolic/yunzelu/pyskl/
+
+GPUS="${GPUS:-4}"
+SEED="${SEED:-42}"
+CONFIG="configs/stgcn++/stgcn++_radarv4/rerun/pseudo_labeling/inner_teachers/fold_a/t4/bone.py"
+
+bash tools/dist_train.sh "${CONFIG}" "${GPUS}" --validate --test-best --seed "${SEED}" --deterministic
