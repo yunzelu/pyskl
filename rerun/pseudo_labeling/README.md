@@ -272,3 +272,49 @@ The row-level tables are CSV files because the H100 cluster environment does
 not provide a Parquet backend. Existing stream MC arrays are reused when
 present, so rerunning a failed teacher job can continue to CSV/NPZ table
 writing without recomputing completed stream outputs.
+
+### Local Scripts
+
+Generate local WSL/Linux-style scripts:
+
+```bash
+python rerun/pseudo_labeling/generate_oof_pseudo_label_local_scripts.py --overwrite
+```
+
+They are written under:
+
+```text
+rerun/pseudo_labeling/local/oof_pseudo_labels/
+```
+
+Run one local teacher system:
+
+```bash
+bash rerun/pseudo_labeling/local/oof_pseudo_labels/run_oof_fold_a_t1_local.sh
+```
+
+Run one local fold aggregation:
+
+```bash
+bash rerun/pseudo_labeling/local/oof_pseudo_labels/run_aggregate_fold_a_local.sh
+```
+
+Run all local aggregations:
+
+```bash
+bash rerun/pseudo_labeling/local/oof_pseudo_labels/run_all_aggregations_local.sh
+```
+
+Local OOF inference still requires a local PYSKL runtime with `torch`, `mmcv`,
+and `pyskl`. The local teacher scripts default to CPU:
+
+```text
+DEVICE=cpu
+NUM_PASSES=30
+BATCH_SIZE=64
+NUM_WORKERS=0
+NUM_THREADS=16
+```
+
+For a quick local smoke test, override `NUM_PASSES=2`. That is not the thesis
+protocol; the canonical OOF artifacts must use `NUM_PASSES=30`.
