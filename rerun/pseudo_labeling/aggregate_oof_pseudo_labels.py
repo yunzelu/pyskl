@@ -41,6 +41,8 @@ from rerun.pseudo_labeling.run_inner_teacher_oof_pseudo_labeling import (  # noq
 )
 
 
+DEFAULT_RAW_TIMESTAMP_ROOT = Path("E:/_dataset/raw_collection_25-1-11-radar")
+
 TRAINING_SAFE_FORBIDDEN_FIELDS = {
     "manual_label_at_skeleton_center",
     "manual_label_name_at_skeleton_center",
@@ -78,6 +80,8 @@ ALIGNMENT_COLUMNS = [
     "nominal_camera_time_center_sec",
     "camera_fps_for_nominal_time",
     "center_timestamp_policy",
+    "source_timestamp_source",
+    "source_timestamp_file",
     "max_adjacent_gap_sec",
     "window_span_sec",
     "hard_pseudo_label_id",
@@ -149,6 +153,120 @@ def source_window_key(row: dict[str, Any]) -> tuple[Any, ...]:
         int(row["window_start_retained_idx"]),
         int(row["source_frame_center"]),
     )
+
+
+class RealTimestampLookup:
+    def __init__(self, root: Path | None, require: bool = False) -> None:
+        self.root = root
+        self.require = require
+        self.cache: dict[str, dict[int, float]] = {}
+        self.enabled = root is not None and root.exists()
+        if root is not None and require and not root.exists():
+            raise FileNotFoundError(f"Raw timestamp root does not exist: {root}")
+
+    def load_recording(self, recording_id: str) -> dict[int, float]:
+        if recording_id in self.cache:
+            return self.cache[recording_id]
+        if self.root is None:
+            raise RuntimeError("No raw timestamp root configured")
+
+        path = self.root / recording_id / "timestamps.csv"
+        if not path.exists():
+            raise FileNotFoundError(path)
+
+        timestamps: dict[int, float] = {}
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            if reader.fieldnames is None:
+                raise ValueError(f"{path} has no header")
+            columns = {name.lower(): name for name in reader.fieldnames}
+            if "frame" not in columns or "timestamp" not in columns:
+                raise ValueError(f"{path} must contain Frame and Timestamp columns")
+            frame_column = columns["frame"]
+            timestamp_column = columns["timestamp"]
+            for row in reader:
+                frame = int(float(row[frame_column]))
+                timestamp = float(row[timestamp_column])
+                timestamps[frame] = timestamp
+
+        if not timestamps:
+            raise ValueError(f"{path} contains no timestamp rows")
+        self.cache[recording_id] = timestamps
+        return timestamps
+
+    def lookup(self, recording_id: str, frame: int) -> tuple[float, Path] | None:
+        if not self.enabled:
+            return None
+        timestamp_map = self.load_recording(recording_id)
+        if frame not in timestamp_map:
+            raise KeyError(f"Frame {frame} is absent from {self.root / recording_id / 'timestamps.csv'}")
+        return timestamp_map[frame], self.root / recording_id / "timestamps.csv"
+
+
+def apply_real_timestamps_to_rows(
+    rows: list[dict[str, Any]],
+    lookup: RealTimestampLookup,
+) -> dict[str, Any]:
+    if not lookup.enabled:
+        return {
+            "real_timestamp_applied": False,
+            "real_timestamp_root": str(lookup.root) if lookup.root is not None else None,
+            "real_timestamp_reason": "raw timestamp root not configured or not found",
+            "rows_updated": 0,
+            "recordings_loaded": 0,
+        }
+
+    rows_updated = 0
+    recording_files: dict[str, str] = {}
+    for row in rows:
+        recording_id = str(row["recording_id"])
+        start_frame = int(float(row["source_frame_start"]))
+        center_frame = int(float(row["source_frame_center"]))
+        end_frame = int(float(row["source_frame_end"]))
+
+        start_lookup = lookup.lookup(recording_id, start_frame)
+        center_lookup = lookup.lookup(recording_id, center_frame)
+        end_lookup = lookup.lookup(recording_id, end_frame)
+        if start_lookup is None or center_lookup is None or end_lookup is None:
+            raise RuntimeError("Real timestamp lookup became disabled during aggregation")
+
+        start_timestamp, source_file = start_lookup
+        center_timestamp, _ = center_lookup
+        end_timestamp, _ = end_lookup
+
+        row["source_timestamp_start_sec"] = start_timestamp
+        row["source_timestamp_center_sec"] = center_timestamp
+        row["source_timestamp_end_sec"] = end_timestamp
+        row["center_timestamp_sec"] = center_timestamp
+        row["center_timestamp_policy"] = (
+            "real camera timestamp from raw_collection timestamps.csv keyed by original source_frame_center"
+        )
+        row["source_timestamp_source"] = "raw_collection_timestamps_csv"
+        row["source_timestamp_file"] = str(source_file)
+        recording_files[recording_id] = str(source_file)
+        rows_updated += 1
+
+    return {
+        "real_timestamp_applied": True,
+        "real_timestamp_root": str(lookup.root),
+        "rows_updated": rows_updated,
+        "recordings_loaded": len(lookup.cache),
+        "recording_timestamp_files": dict(sorted(recording_files.items())),
+    }
+
+
+def apply_real_timestamps_to_paired_rows(
+    safe_rows: list[dict[str, Any]],
+    audit_rows: list[dict[str, Any]],
+    lookup: RealTimestampLookup,
+) -> dict[str, Any]:
+    safe_summary = apply_real_timestamps_to_rows(safe_rows, lookup)
+    audit_summary = apply_real_timestamps_to_rows(audit_rows, lookup)
+    return {
+        **safe_summary,
+        "safe_rows_updated": safe_summary["rows_updated"],
+        "audit_rows_updated": audit_summary["rows_updated"],
+    }
 
 
 def validate_fold_rows(
@@ -320,6 +438,11 @@ def aggregate_fold(args: argparse.Namespace, fold: str) -> dict[str, Any]:
 
     safe_rows = sorted_rows(safe_rows)
     audit_rows = sorted_rows(audit_rows)
+    timestamp_summary = apply_real_timestamps_to_paired_rows(
+        safe_rows,
+        audit_rows,
+        RealTimestampLookup(args.raw_timestamp_root, require=args.require_real_timestamps),
+    )
     summary = validate_fold_rows(fold, safe_rows, audit_rows, metadata_by_teacher)
     alignment_rows = alignment_rows_from_safe_rows(safe_rows)
     assert_no_manual_fields(alignment_rows, f"fold {fold} radar alignment rows")
@@ -342,6 +465,7 @@ def aggregate_fold(args: argparse.Namespace, fold: str) -> dict[str, Any]:
             "alignment_output": fold_dir / "radar_teacher_alignment.csv",
             "teacher_metadata": metadata_by_teacher,
             "validation_checks": summary,
+            "real_timestamp_lookup": timestamp_summary,
             "training_safe_files_exclude_manual_labels": True,
         },
     )
@@ -374,6 +498,8 @@ def run(args: argparse.Namespace) -> None:
             "training_safe_file": "fold_<fold>/oof_skeleton_pseudo_labels.csv",
             "audit_file": "fold_<fold>/oof_skeleton_pseudo_labels_audit.csv",
             "radar_alignment_manifest": "fold_<fold>/radar_teacher_alignment.csv",
+            "real_timestamp_root": args.raw_timestamp_root,
+            "require_real_timestamps": args.require_real_timestamps,
         },
     )
     print(f"[DONE] wrote aggregation reports under {args.report_dir}")
@@ -391,6 +517,20 @@ def parse_args() -> argparse.Namespace:
         "--report-dir",
         type=Path,
         default=Path("rerun/pseudo_labeling/reports/oof_pseudo_labels_v1"),
+    )
+    parser.add_argument(
+        "--raw-timestamp-root",
+        type=Path,
+        default=DEFAULT_RAW_TIMESTAMP_ROOT,
+        help=(
+            "Optional raw collection root containing recording_id/timestamps.csv. "
+            "When present, source timestamp fields are replaced by real camera timestamps."
+        ),
+    )
+    parser.add_argument(
+        "--require-real-timestamps",
+        action="store_true",
+        help="Fail if --raw-timestamp-root is missing or any required timestamp lookup fails.",
     )
     return parser.parse_args()
 

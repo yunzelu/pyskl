@@ -251,6 +251,29 @@ Fold aggregation is:
 python rerun/pseudo_labeling/aggregate_oof_pseudo_labels.py --folds a b c
 ```
 
+When the raw radar collection is available locally, aggregation replaces the
+assumed skeleton timestamps with the real camera timestamps from:
+
+```text
+E:/_dataset/raw_collection_25-1-11-radar/<recording_id>/timestamps.csv
+```
+
+Run with strict checking:
+
+```bash
+python rerun/pseudo_labeling/aggregate_oof_pseudo_labels.py \
+  --folds a b c \
+  --raw-timestamp-root E:/_dataset/raw_collection_25-1-11-radar \
+  --require-real-timestamps
+```
+
+The lookup uses `source_frame_start`, `source_frame_center`, and
+`source_frame_end` as original RGB frame indices. It updates
+`source_timestamp_start_sec`, `source_timestamp_center_sec`,
+`source_timestamp_end_sec`, and `center_timestamp_sec`. The original nominal
+camera time from `source_frame_center / 30` remains in
+`nominal_camera_time_center_sec` for auditing.
+
 It writes:
 
 ```text
@@ -318,3 +341,36 @@ NUM_THREADS=16
 
 For a quick local smoke test, override `NUM_PASSES=2`. That is not the thesis
 protocol; the canonical OOF artifacts must use `NUM_PASSES=30`.
+
+### Analyze OOF Pseudo Labels
+
+After fold aggregation, run the audit-only pseudo-label report locally:
+
+```bash
+python rerun/pseudo_labeling/analyze_oof_pseudo_labels.py
+```
+
+It reads:
+
+```text
+data/radar_v4/rerun/yolo26xpose/pseudo_labels_v1/fold_<fold>/oof_skeleton_pseudo_labels_audit.csv
+```
+
+and writes:
+
+```text
+rerun/pseudo_labeling/reports/oof_pseudo_labels_v1/oof_pseudo_label_analysis_fold_metrics.csv
+rerun/pseudo_labeling/reports/oof_pseudo_labels_v1/oof_pseudo_label_analysis_mean_sd.csv
+rerun/pseudo_labeling/reports/oof_pseudo_labels_v1/oof_pseudo_label_analysis_summary.json
+rerun/pseudo_labeling/reports/oof_pseudo_labels_v1/oof_pseudo_label_analysis_summary.md
+```
+
+The report uses manual center labels only from the audit table. The training-safe
+CSV remains free of manual labels. If normalized uncertainty is not stored as an
+explicit column, the report reconstructs:
+
+```text
+u_norm = min(mc_mi_raw / max(mi_q95_calibration, 1e-12), 1)
+```
+
+and checks it against the saved reliability weight formula.
