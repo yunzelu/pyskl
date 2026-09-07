@@ -112,9 +112,57 @@ the PKL from the raw inputs.
 python -m unittest project.dataset.test_build_radar_v4_10fps
 ```
 
-Training configuration creation is a separate step. A project config should
-point to this PKL and use `clip_len=20`; the existing rerun configs resample
-to 60 frames and refer to the thesis data paths.
+## Four-stream ST-GCN++ training
+
+Generate the configs and SLURM job scripts from the project dataset summary:
+
+```powershell
+python project/generate_stgcnpp_configs.py
+```
+
+| Stream | Feature | Config | Job |
+| --- | --- | --- | --- |
+| Joint | `j` | `project/configs/stgcnpp/fps10_phase0/joint.py` | `project/slurm/train_joint.sh` |
+| Bone | `b` | `project/configs/stgcnpp/fps10_phase0/bone.py` | `project/slurm/train_bone.sh` |
+| Joint motion | `jm` | `project/configs/stgcnpp/fps10_phase0/joint_motion.py` | `project/slurm/train_joint_motion.sh` |
+| Bone motion | `bm` | `project/configs/stgcnpp/fps10_phase0/bone_motion.py` | `project/slurm/train_bone_motion.sh` |
+
+Each stream trains a separate ST-GCN++ model. The configs retain the reference
+`configs/stgcn++/stgcn++_radarv4/rerun/e1/fold_a/bone/b_continuous_window.py`
+model, augmentation, optimization, and evaluation settings:
+
+- Nine classes, one person, three input channels, head dropout 0.5.
+- `clip_len=20` for training, validation, and best-checkpoint inference.
+- Square-root sampling with replacement, fixed `epoch_size=55000` global
+  draws per epoch from 54,492 training windows. With four GPUs this is 13,750
+  samples per rank, without distributed padding.
+- 20 epochs, SGD learning rate 0.05, momentum 0.9, weight decay 0.0005,
+  Nesterov momentum, and cosine learning-rate decay.
+- Batch size 16 and two data-loader workers per GPU.
+- Validation on yunze; the best checkpoint is selected by validation macro F1.
+  Evaluation reports macro F1 and top-1 accuracy.
+
+Each job requests **4 A100 GPUs, 12 CPUs, 62 GB RAM, and 02:30:00 wall time**.
+It uses the account, modules, and virtual environment from the rerun job,
+with seed 42 and deterministic training. The default remote repository path
+is `~/projects/def-mbolic/yunzelu/pyskl`; set `PROJECT_REPO_ROOT` to override it.
+The time setting is a scheduler limit, not a measured completion estimate.
+
+Submit each job from the repository root on the cluster after copying the
+project scripts/configs and the project PKL there:
+
+```bash
+sbatch project/slurm/train_joint.sh
+sbatch project/slurm/train_bone.sh
+sbatch project/slurm/train_joint_motion.sh
+sbatch project/slurm/train_bone_motion.sh
+```
+
+Outputs are isolated under `work_dirs/project/stgcnpp/fps10_phase0/<stream>/`,
+including checkpoints, logs, and `sampler_indices/`. Each job also runs
+`--test-best` to export `best_pred.pkl` and `best_eval.json`. The config's
+`data.test` points to `split='val'`, so these files contain yunze validation
+results. SLURM logs go to `project/slurm/`.
 
 ## Phase-0 build audit
 
