@@ -178,3 +178,11 @@ For `49-jiadi-laysofa`, the existing raw pose JSONL contains 18,056 frame rows
 while the CSV contains 18,490 timestamps. The build uses the available pose
 rows and reports the 434 unmatched CSV rows in its preprocessing statistics
 and audit report.
+
+## Inference on external pose CSVs
+
+See [infer/README.md](infer/README.md) for direct streaming inference from
+`*_cf.csv` and paired `*_mm.json` multiperson masks. It uses 20-frame windows,
+stride 4, center offset 10, and probability fusion `j:b:jm:bm = 2:2:1:1`.
+The supplied launcher selects the June 23 and July 20 10 fps files and excludes
+the April 18 30 fps file.
