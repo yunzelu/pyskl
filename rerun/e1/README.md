@@ -256,6 +256,11 @@ Protocol details:
   matching the official sequence-label evaluation convention.
 - Match predicted and ground-truth segments only within the same recording and
   only when the class labels match.
+- Follow the official MS-TCN matching rule in prediction order: select the
+  reference with the highest IoU first, then count a true positive only if the
+  threshold is met and that reference has not already been matched. If the best
+  reference is already matched, count a false positive without trying another
+  reference. Equal-IoU candidates retain the first reference in temporal order.
 - For each threshold, sum TP, FP, and FN counts across recordings in the fold,
   then compute one fold-level F1 score.
 - Compute normalized Levenshtein Edit per recording after collapsing labels,
@@ -273,3 +278,22 @@ Optional flags:
 python rerun/e1/evaluate_continuous_segmental.py --background-labels <label-or-id>
 python rerun/e1/evaluate_continuous_segmental.py --overlap-axis center_source_frame
 ```
+
+### Reports Using the Official MS-TCN Matching Rule
+
+The original reports directly under `rerun/e1/reports/` used the earlier
+best-unmatched-reference matching variant and are retained for comparison.
+Reports using the official best-overlap-then-check-matched rule are written to
+`rerun/e1/reports/ms_tcn_official/`. The temporal axis remains ordered window
+indices, and no background class is excluded.
+
+Regenerate both the combined summaries and the segmental reports from saved
+predictions, without rerunning inference or rewriting fusion predictions:
+
+```powershell
+python rerun/e1/summarize_results.py --no-write-fusion-predictions --output-dir rerun/e1/reports/ms_tcn_official
+python rerun/e1/summarize_validation_results.py --no-write-fusion-predictions --output-dir rerun/e1/reports/ms_tcn_official
+```
+
+The standalone segmental JSON reports record the matching convention in
+`matching_rule`, and their Markdown reports describe it explicitly.

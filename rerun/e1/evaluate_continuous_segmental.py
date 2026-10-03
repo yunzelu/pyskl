@@ -37,6 +37,11 @@ LABEL_TO_ID = {label: idx for idx, label in enumerate(LABELS)}
 FOLDS = ["a", "b", "c"]
 STREAMS = ["joint", "bone"]
 THRESHOLDS = [0.10, 0.25, 0.50]
+MATCHING_RULE = "ms_tcn_best_overlap_then_check_matched"
+MATCHING_REFERENCE = (
+    "https://github.com/yabufarha/ms-tcn/blob/"
+    "33ed91c0c7576650a2367efc602553af4c5295b1/eval.py"
+)
 
 
 @dataclass(frozen=True)
@@ -276,6 +281,7 @@ def f1_counts_for_threshold(
     pred_segments: list[Segment],
     threshold: float,
 ) -> tuple[int, int, int]:
+    """Use MS-TCN's best-overlap selection followed by its duplicate check."""
     matched_gt: set[int] = set()
     tp = 0
     fp = 0
@@ -284,13 +290,15 @@ def f1_counts_for_threshold(
         best_index = -1
         best_iou = 0.0
         for gt_index, gt_segment in enumerate(gt_segments):
-            if gt_index in matched_gt or pred_segment.label != gt_segment.label:
+            if pred_segment.label != gt_segment.label:
                 continue
             iou = segment_iou(pred_segment, gt_segment)
             if iou > best_iou:
                 best_iou = iou
                 best_index = gt_index
-        if best_index >= 0 and best_iou >= threshold:
+        # MS-TCN selects the best reference before checking whether it was hit.
+        # Do not fall back to another reference when the best one is matched.
+        if best_index >= 0 and best_iou >= threshold and best_index not in matched_gt:
             tp += 1
             matched_gt.add(best_index)
         else:
@@ -490,6 +498,12 @@ def markdown_report(
         "pools TP, FP, and FN counts across recordings within the fold. Edit is",
         "normalized per recording and then averaged across recordings in the fold.",
         "",
+        "Matching follows the official MS-TCN rule: select the highest-IoU",
+        "same-class reference first, then accept it only if the threshold is met",
+        "and that reference is unmatched. An already-matched best reference",
+        "makes the prediction a false positive; no alternative is selected.",
+        f"Reference: [MS-TCN evaluator]({MATCHING_REFERENCE}).",
+        "",
         "## Mean +- SD Across Folds",
         "",
         "| Condition | Stream | Edit | F1@10 | F1@25 | F1@50 |",
@@ -608,6 +622,8 @@ def evaluate_continuous_segmental(
             "labels": LABELS,
             "background_label_ids": sorted(background),
             "overlap_axis": axis,
+            "matching_rule": MATCHING_RULE,
+            "matching_reference": MATCHING_REFERENCE,
             "result_subdir": result_subdir,
             "fold_metrics": fold_rows,
             "recording_metrics": recording_rows,
@@ -630,6 +646,8 @@ def evaluate_continuous_segmental(
         newline="\n",
     )
     return {
+        "matching_rule": MATCHING_RULE,
+        "matching_reference": MATCHING_REFERENCE,
         "fold_metrics": fold_rows,
         "recording_metrics": recording_rows,
         "mean_sd": summary_rows,
