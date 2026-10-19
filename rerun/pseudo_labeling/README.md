@@ -374,3 +374,96 @@ u_norm = min(mc_mi_raw / max(mi_q95_calibration, 1e-12), 1)
 ```
 
 and checks it against the saved reliability weight formula.
+
+### Evaluate quality with the E1-B / E3 metric definitions
+
+For the full quality evaluation from saved predictions:
+
+```powershell
+python rerun/pseudo_labeling/evaluate_oof_pseudo_labels.py
+```
+
+Reports are written separately to
+`reports/oof_pseudo_labels_v1/e1b_e3_quality/summary.md` (with JSON and CSV
+details). The evaluator joins every pseudo target to the E1-B continuous-window
+pkl's outer `train` split, checking exact coverage, center labels, source-frame
+identity and teacher subject exclusions. The target is retained detection 30 of
+the 60-detection window. Corrected real camera timestamps in aggregate CSVs do
+not replace this source-frame annotation rule.
+
+Top-1 accuracy and nine-class macro F1 reuse E1's implementation. Edit and
+segmental F1@10/25/50 reuse the current E1 evaluator: ordered window indices,
+independent recordings, recording-mean Edit, and pooled segment counts for F1.
+The matching convention agrees with `rerun/e1/reports/ms_tcn_official/`; the
+original E1 root reports used the earlier best-unmatched-reference rule.
+
+NLL, Brier and 15-bin top-label ECE reuse E3's implementation for both saved raw
+and calibrated probabilities. Error rate, random AUPRC, error AUROC and error
+AP reuse E2B, since E1/E3 do not define error-ranking metrics. Raw MI is the
+primary ranking score for E2B comparability; the legacy normalized/clipped MI
+score is reported separately. Teacher-specific normalization and clipping can
+change the rankings. Fold summaries use equal-fold means and sample SD.
+
+For independent reconstruction of the saved MC outputs and provenance:
+
+```powershell
+python rerun/pseudo_labeling/audit_oof_saved_artifacts.py
+```
+
+This checks the archived joint/bone passes, fusion, predictive means, MI,
+calibration, sample ordering and teacher metadata, and writes
+`e1b_e3_quality/saved_artifact_audit.json`. These OOF targets are outer-training
+subjects and overlap across outer folds; their metrics are not outer-test
+performance estimates for E1/E3.
+
+### Evaluate targets retained for PointCam R3 radar training
+
+```powershell
+python rerun/pseudo_labeling/evaluate_r3_radar_pseudo_labels.py
+```
+
+This reads the sibling `PointCam/data/rerun/r3` directory and writes
+`reports/oof_pseudo_labels_v1/r3_retained_radar_quality/summary.md`, with JSON
+and CSV details. Use `--pointcam-root` if PointCam is elsewhere.
+
+The evaluated samples are the retained **radar** training windows (40 frames,
+center offset 20). Ground truth comes from R3 `continuous_window` annotations
+joined by radar `frame_id`; the associated skeleton window's ground truth is
+kept separate in `joined_radar_audit.csv`. The evaluator verifies identical
+ordered retained IDs and associations across all six pseudo-target variants,
+replays the saved recording/gap selection audit, and checks saved associations
+with the original nearest-teacher lookup. Inputs remain unchanged.
+
+Classification, temporal, ranking and calibration metric definitions reuse
+the same E1/E2B/E3 functions as the skeleton quality report. NLL/Brier/ECE use
+the exact saved raw/calibrated student soft targets; supplemental metrics of
+the assigned probability vectors document the tiny float32 renormalization
+difference. Evaluation is unweighted; training loss weights do not alter the
+quality metric definitions. Temporal metrics use ordered retained radar
+windows within each recording, including the existing convention of
+compressing gaps left by filtering.
+
+### Evaluate R2 radar targets without the association-gap cutoff
+
+```powershell
+python rerun/pseudo_labeling/evaluate_r2_radar_pseudo_labels.py
+```
+
+This evaluates all four saved variants under
+`PointCam/data/rerun/r2_pseudo_targets` and writes
+`reports/oof_pseudo_labels_v1/r2_no_gap_radar_quality/summary.md`, with the same
+metric/audit CSVs as R3. Ground truth comes from the original
+`PointCam/data/rerun/radar_dataset/continuous_window` PKLs, which still contain
+the radar windows later removed by R3's association-gap filter.
+
+The evaluator verifies that R2 training IDs equal the original radar training
+IDs minus the missing-teacher recording `38-mia-fall2`, with no teacher-to-radar
+center-gap cutoff. The original within-radar-window validity constraints
+(adjacent gap <=0.5 s, span <=2.5 s) still apply. Calibrated soft probabilities
+come from the saved `weighted_calibrated_mc_soft` targets; quality metrics do
+not use their training loss weights.
+
+Both radar reports explicitly distinguish radar-center ground truth from
+associated skeleton-center ground truth. Their ground-truth disagreement
+counts are different from pseudo-label error counts; every quality metric
+uses the radar-center label joined by exact radar `frame_id`.

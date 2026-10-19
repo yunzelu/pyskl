@@ -5,19 +5,19 @@ Split: validation. Protocol: E1-B continuous windows.
 Positive class is branch-specific activity error:
 `argmax(p_branch) != manual_center_label`.
 Ranking score is the same branch's mutual information; larger MI means more likely wrong.
-Error AUPRC is average precision, not trapezoidal PR area.
+Error AP is non-interpolated average precision: `AP = sum_n (R_n - R_{n-1}) P_n`.
 State/transition AUROCs use subsets defined by the manual center label.
 
 ## Mean +- SD Across Folds
 
-| Branch | Error rate | Random AUPRC baseline | Error AUROC | Error AUPRC/AP | State Error AUROC | Transition Error AUROC |
+| Branch | Error rate | Random AP baseline | Error AUROC | Error AP | State Error AUROC | Transition Error AUROC |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Laplace | 0.0532 +- 0.0102 | 0.0532 +- 0.0102 | 0.9189 +- 0.0179 | 0.3179 +- 0.0115 | 0.9451 +- 0.0150 | 0.8702 +- 0.1088 |
 | MC dropout | 0.0533 +- 0.0106 | 0.0533 +- 0.0106 | 0.9217 +- 0.0202 | 0.3134 +- 0.0412 | 0.9428 +- 0.0035 | 0.8778 +- 0.0799 |
 
 ## Fold Metrics
 
-| Branch | Fold | N | Errors | Error rate | Random AUPRC baseline | Error AUROC | Error AUPRC/AP | State Error AUROC | Transition Error AUROC |
+| Branch | Fold | N | Errors | Error rate | Random AP baseline | Error AUROC | Error AP | State Error AUROC | Transition Error AUROC |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Laplace | A | 5766 | 357 | 0.0619 | 0.0619 | 0.8983 | 0.3121 | 0.9624 | 0.7449 |
 | Laplace | B | 3870 | 216 | 0.0558 | 0.0558 | 0.9304 | 0.3311 | 0.9366 | 0.9401 |

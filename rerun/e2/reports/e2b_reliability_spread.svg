@@ -28,7 +28,7 @@
 <circle cx="332.6" cy="87.2" r="4" fill="#fff" stroke="#c75a2a" stroke-width="2"><title>Laplace fold B: 0.9304</title></circle>
 <circle cx="345.6" cy="87.6" r="4" fill="#fff" stroke="#c75a2a" stroke-width="2"><title>Laplace fold C: 0.9280</title></circle>
 <text x="332.6" y="268" text-anchor="middle" font-size="11">Laplace</text>
-<text x="730.0" y="63" text-anchor="middle" font-size="14" font-weight="600">Error AUPRC/AP</text>
+<text x="730.0" y="63" text-anchor="middle" font-size="14" font-weight="600">Error AP</text>
 <line x1="550" y1="250" x2="942" y2="250" stroke="#222" stroke-width="1" />
 <line x1="550" y1="75" x2="550" y2="250" stroke="#222" stroke-width="1" />
 <line x1="546" y1="250.0" x2="550" y2="250.0" stroke="#222" stroke-width="1" />

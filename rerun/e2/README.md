@@ -241,11 +241,19 @@ python rerun/e2/evaluate_e2b_reliability.py
 ```
 
 No extra Python package is required. The script implements binary AUROC and
-average precision directly. Error AUPRC is average precision:
+average precision directly. Error AP (average precision) uses the definition in
+[`sklearn.metrics.average_precision_score`](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.average_precision_score.html):
 
 ```text
 AP = sum_n (R_n - R_{n-1}) P_n
 ```
+
+Precision is weighted by the increase in recall at each distinct score threshold,
+without interpolation. This differs from trapezoidal area under the
+precision-recall curve. The random AP baseline is the error prevalence.
+Saved CSV/JSON fields retain the legacy names `error_auprc_ap`,
+`random_auprc_baseline`, and `error_auprc_definition` (including subset and
+summary variants) for compatibility; reports and charts label the metric Error AP.
 
 For each branch, the binary positive class is that branch's own activity error:
 

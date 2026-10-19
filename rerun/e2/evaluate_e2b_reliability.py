@@ -399,12 +399,12 @@ def markdown_report(rows: list[dict[str, Any]], summary_rows: list[dict[str, Any
         "Positive class is branch-specific activity error:",
         "`argmax(p_branch) != manual_center_label`.",
         "Ranking score is the same branch's mutual information; larger MI means more likely wrong.",
-        "Error AUPRC is average precision, not trapezoidal PR area.",
+        "Error AP is non-interpolated average precision: `AP = sum_n (R_n - R_{n-1}) P_n`.",
         "State/transition AUROCs use subsets defined by the manual center label.",
         "",
         "## Mean +- SD Across Folds",
         "",
-        "| Branch | Error rate | Random AUPRC baseline | Error AUROC | Error AUPRC/AP | State Error AUROC | Transition Error AUROC |",
+        "| Branch | Error rate | Random AP baseline | Error AUROC | Error AP | State Error AUROC | Transition Error AUROC |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for row in summary_rows:
@@ -425,7 +425,7 @@ def markdown_report(rows: list[dict[str, Any]], summary_rows: list[dict[str, Any
             "",
             "## Fold Metrics",
             "",
-            "| Branch | Fold | N | Errors | Error rate | Random AUPRC baseline | Error AUROC | Error AUPRC/AP | State Error AUROC | Transition Error AUROC |",
+            "| Branch | Fold | N | Errors | Error rate | Random AP baseline | Error AUROC | Error AP | State Error AUROC | Transition Error AUROC |",
             "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
         ]
     )
@@ -537,7 +537,7 @@ def write_svg_chart(path: Path, rows: list[dict[str, Any]], summary_rows: list[d
     height = 620
     panels = [
         ("error_auroc", "Error AUROC", 20, 45, 460, 245),
-        ("error_auprc_ap", "Error AUPRC/AP", 500, 45, 460, 245),
+        ("error_auprc_ap", "Error AP", 500, 45, 460, 245),
         ("state_error_auroc", "State Error AUROC", 20, 330, 460, 245),
         ("transition_error_auroc", "Transition Error AUROC", 500, 330, 460, 245),
     ]
