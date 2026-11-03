@@ -3,7 +3,7 @@
 #SBATCH --gpus=nvidia_h100_80gb_hbm3_3g.40gb:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
-#SBATCH --time=00:40:00
+#SBATCH --time=00:45:00
 #SBATCH --job-name=e2_test
 #SBATCH --output=rerun/e2/slurm/%x_%j.out
 #SBATCH --mail-user=yunzelu@outlook.com

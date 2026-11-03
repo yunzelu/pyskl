@@ -3,7 +3,7 @@
 #SBATCH --gpus=h100_1g.10gb:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --time=00:30:00
+#SBATCH --time=01:00:00
 #SBATCH --job-name=project_infer_0903_10fps
 #SBATCH --output=project/slurm/%x_%j.out
 #SBATCH --mail-user=yunzelu@outlook.com
@@ -26,10 +26,30 @@ NUM_THREADS="${NUM_THREADS:-4}"
 
 # Process every *_cf.csv in this directory with its paired *_mm.json mask.
 # All four streams run in one process on the allocated H100 GPU slice.
-python -u project/infer/infer_csv.py data/project/csv \
+python -u project/infer/infer_csv.py data/project/csv/310 \
   --model-root work_dirs/project/stgcnpp/fps10_phase0 \
   --config-root project/configs/stgcnpp/fps10_phase0 \
-  --output-dir work_dirs/project/inference/0903_10fps \
+  --output-dir work_dirs/project/inference/0903_10fps/310 \
+  --device cuda:0 \
+  --batch-size "${BATCH_SIZE}" \
+  --chunk-size "${CHUNK_SIZE}" \
+  --num-threads "${NUM_THREADS}" \
+  "$@"
+
+python -u project/infer/infer_csv.py data/project/csv/339 \
+  --model-root work_dirs/project/stgcnpp/fps10_phase0 \
+  --config-root project/configs/stgcnpp/fps10_phase0 \
+  --output-dir work_dirs/project/inference/0903_10fps/339 \
+  --device cuda:0 \
+  --batch-size "${BATCH_SIZE}" \
+  --chunk-size "${CHUNK_SIZE}" \
+  --num-threads "${NUM_THREADS}" \
+  "$@"
+
+python -u project/infer/infer_csv.py data/project/csv/240 \
+  --model-root work_dirs/project/stgcnpp/fps10_phase0 \
+  --config-root project/configs/stgcnpp/fps10_phase0 \
+  --output-dir work_dirs/project/inference/0903_10fps/240 \
   --device cuda:0 \
   --batch-size "${BATCH_SIZE}" \
   --chunk-size "${CHUNK_SIZE}" \
